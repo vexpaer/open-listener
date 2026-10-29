@@ -195,7 +195,7 @@ class CloudTranslationTest {
         try { block(server, client) } finally {
             client.dispatcher.executorService.shutdownNow()
             client.connectionPool.evictAll()
-            server.shutdown()
+            runCatching { server.shutdown() }
         }
     }
 }

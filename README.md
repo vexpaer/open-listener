@@ -10,13 +10,13 @@ Native Android · live bilingual text · no audio files
 
 [中文说明](README.zh-CN.md) · [Build](#build) · [Privacy](PRIVACY.md) · [License](LICENSE)
 
-**APK: not yet published. Cloud build/release requires permission to create the public repository.**
+**APK: not yet published. Cloud build and emulator verification are in progress.**
 
 </div>
 
 Open Listener is a text-first Android companion for lectures, classes and seminars. Tap once while the app is visible, follow original and translated segments, and keep the confirmed text as a searchable record. The app never writes microphone PCM to an audio file.
 
-> **Status: source implementation, not a verified release.** Creating the public GitHub repository was blocked by the execution permission boundary. No Android build or automated Android/JVM test has run yet; no APK or CI success is claimed. The implementation and outstanding checks are tracked in [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
+> **Status: source implementation, not yet a verified release.** [Hosted CI](https://github.com/vexpaer/open-listener/actions/workflows/android-ci.yml) is running and build issues are being corrected. No successful CI or release APK is claimed until verification completes. The implementation and outstanding checks are tracked in [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
 ## What it does
 

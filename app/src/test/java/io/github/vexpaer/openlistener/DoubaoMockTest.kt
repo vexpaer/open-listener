@@ -237,9 +237,10 @@ class DoubaoMockTest {
         GZIPInputStream(ByteArrayInputStream(frame, 12, frame.size - 12)).use { it.readBytes().toString(Charsets.UTF_8) }
 
     private suspend fun cleanup(engine: DoubaoRealtimeAsr, server: MockWebServer, client: OkHttpClient) {
-        try { engine.close() } catch (_: DoubaoAsrException) { }
+        runCatching { engine.close() }
+        client.dispatcher.cancelAll()
         client.dispatcher.executorService.shutdownNow()
         client.connectionPool.evictAll()
-        server.shutdown()
+        runCatching { server.shutdown() }
     }
 }
