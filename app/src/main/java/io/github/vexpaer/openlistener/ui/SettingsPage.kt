@@ -36,6 +36,7 @@ internal fun SettingsPage(model: OpenListenerViewModel) {
     val modelStates by model.modelStates.collectAsState()
     val editingAllowed = !state.isSessionActive()
     val list = rememberLazyListState()
+    var guideFor by rememberSaveable { mutableStateOf<String?>(null) }
     var credentialsFor by rememberSaveable { mutableStateOf<String?>(null) }
     var deleteLanguage by rememberSaveable { mutableStateOf<String?>(null) }
     var deleteModel by rememberSaveable { mutableStateOf<String?>(null) }
@@ -183,8 +184,11 @@ internal fun SettingsPage(model: OpenListenerViewModel) {
                             FilterChip(false, onClick = {}, enabled = false, label = { Text(tr("阿里云 · 未支持", "Aliyun · Unavailable")) })
                             FilterChip(false, onClick = {}, enabled = false, label = { Text(tr("OpenAI · 未支持", "OpenAI · Unavailable")) })
                         }
-                        OutlinedButton(onClick = { credentialsFor = "doubao" }, enabled = editingAllowed, modifier = Modifier.testTag("asr-credentials")) {
-                            Text(tr("配置 API", "Configure API"))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { credentialsFor = "doubao" }, enabled = editingAllowed, modifier = Modifier.testTag("asr-credentials")) {
+                                Text(tr("配置 API", "Configure API"))
+                            }
+                            ApiHelpButton("asr-api-help") { guideFor = "doubao" }
                         }
                         OutlinedButton(onClick = model::checkSelectedEngines, enabled = !check.busy) {
                             Text(if (check.busy) tr("检查中…", "Checking…") else tr("检查配置", "Check setup"))
@@ -215,14 +219,21 @@ internal fun SettingsPage(model: OpenListenerViewModel) {
                             "doubao" to tr("豆包", "Doubao"), "qwen" to tr("阿里云", "Aliyun"),
                             "openai" to "OpenAI", "custom" to tr("自定义", "Custom")),
                             prefs.translationProvider, enabled = editingAllowed) { model.setProviders(prefs.asrProvider, it) }
-                        OutlinedButton(onClick = { credentialsFor = "translation_${prefs.translationProvider}" },
-                            enabled = editingAllowed, modifier = Modifier.testTag("translation-credentials")) { Text(tr("配置 API", "Configure API")) }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { credentialsFor = "translation_${prefs.translationProvider}" },
+                                enabled = editingAllowed, modifier = Modifier.testTag("translation-credentials")) { Text(tr("配置 API", "Configure API")) }
+                            ApiHelpButton("translation-api-help") { guideFor = "translation_${prefs.translationProvider}" }
+                        }
                     }
                 }
             }
         }
     }
-    credentialsFor?.let { provider -> CredentialsDialog(provider, model, editingAllowed) { credentialsFor = null } }
+    credentialsFor?.let { provider -> CredentialsDialog(provider, model, editingAllowed,
+        onHelp = { guideFor = provider }, onDismiss = { credentialsFor = null }) }
+    guideFor?.let { provider ->
+        ApiGuidePage(provider, model.credential(provider, "base_url"), model::openUrl) { guideFor = null }
+    }
     deleteLanguage?.let { language ->
         ConfirmDelete(tr("删除语言包？", "Delete language model?"), tr("之后使用该语言翻译，需要重新下载。", "You'll need to download it again to translate this language."),
             onDismiss = { deleteLanguage = null }, onConfirm = { model.deleteLanguageModel(language); deleteLanguage = null })
@@ -234,7 +245,7 @@ internal fun SettingsPage(model: OpenListenerViewModel) {
 }
 
 @Composable
-private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, enabled: Boolean, onDismiss: () -> Unit) {
+private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, enabled: Boolean, onHelp: () -> Unit, onDismiss: () -> Unit) {
     val asr = provider == "doubao"
     val defaultBase = when (provider) {
         "translation_doubao" -> "https://ark.cn-beijing.volces.com/api/v3"
@@ -249,7 +260,12 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
     var base by remember(provider) { mutableStateOf(model.credential(provider, "base_url").ifBlank { defaultBase }) }
     var modelId by remember(provider) { mutableStateOf(model.credential(provider, "model").ifBlank { defaultModel }) }
     val valid = key.isNotBlank() && if (asr) resource.isNotBlank() else base.startsWith("https://") && modelId.isNotBlank()
-    AlertDialog(onDismissRequest = onDismiss, title = { Text(if (asr) tr("豆包实时语音", "Doubao streaming speech") else tr("独立翻译 API", "Independent translation API")) },
+    AlertDialog(onDismissRequest = onDismiss, title = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(if (asr) tr("豆包实时语音", "Doubao streaming speech") else tr("翻译 API", "Translation API"), modifier = Modifier.weight(1f))
+            ApiHelpButton("credentials-api-help", onHelp)
+        }
+    },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Hint(tr("密钥在本机加密保存", "Keys are encrypted on this device"))

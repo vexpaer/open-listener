@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.4 — 2026-10-30
+
+- Replace the ambient sky with icy blue, soft drifting light and fine grain, with a matching dark palette.
+- Add emoji help beside API configuration and inside credential dialogs, opening concise provider-specific guides with clickable official links.
+- Keep unsaved API fields intact when opening and closing help.
+- Correct merged-semantics lookup in the Library preview instrumentation check.
+
 ## 0.1.3 — 2026-10-30
 
 - Use matching icon-only pause/resume and transparent stop controls.

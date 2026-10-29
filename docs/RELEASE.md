@@ -1,6 +1,6 @@
 # Release and signing
 
-Package: `io.github.vexpaer.openlistener`. Version: `0.1.3`, versionCode `103`. Gradle is the single application-version source; release metadata is verified against the actual APK metadata. Public tags use `vMAJOR.MINOR.PATCH` and must match the APK.
+Package: `io.github.vexpaer.openlistener`. Version: `0.1.4`, versionCode `104`. Gradle is the single application-version source; release metadata is verified against the actual APK metadata. Public tags use `vMAJOR.MINOR.PATCH` and must match the APK.
 
 ## Signing contract
 

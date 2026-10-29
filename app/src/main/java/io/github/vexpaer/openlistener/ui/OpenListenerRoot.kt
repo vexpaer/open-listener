@@ -34,6 +34,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.random.Random
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -46,8 +54,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.github.vexpaer.openlistener.service.MicrophoneRecognitionService.State
 import io.github.vexpaer.openlistener.ui.theme.LocalDarkAppearance
-import kotlinx.coroutines.delay
-import java.util.Calendar
 import java.util.Locale
 
 internal val LocalChinese = staticCompositionLocalOf { true }
@@ -62,7 +68,7 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
         "zh" -> true; "en" -> false; else -> configuration.locales[0].language == "zh"
     }
     val environment = rememberMotionEnvironment()
-    val motion = foreground && !preferences.reducedMotion && !environment.lowPower && environment.animatorScale > 0f
+    val motion = foreground && !environment.lowPower && environment.animatorScale > 0f
     CompositionLocalProvider(LocalChinese provides chinese, LocalMotionAllowed provides motion) {
         val nav = rememberNavController()
         val backStack by nav.currentBackStackEntryAsState()
@@ -161,40 +167,50 @@ private fun rememberMotionEnvironment(): MotionEnvironment {
     return environment
 }
 
+/** Soft blue light and fine grain, drawn natively without a full-screen blur pass. */
 @Composable
 private fun AmbientSky(motion: Boolean, foreground: Boolean) {
     val dark = LocalDarkAppearance.current
-    var hour by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) }
-    LaunchedEffect(foreground) {
-        hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        if (foreground) while (true) { delay(60_000); hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
-    }
-    val palette = when {
-        dark -> when (hour) {
-            in 5..9 -> listOf(Color(0xFF252C49), Color(0xFF41445B), Color(0xFF564754))
-            in 10..16 -> listOf(Color(0xFF111B37), Color(0xFF253456), Color(0xFF3F405A))
-            in 17..20 -> listOf(Color(0xFF232543), Color(0xFF45405B), Color(0xFF5B414C))
-            else -> listOf(Color(0xFF10182F), Color(0xFF1B2843), Color(0xFF30354A))
+    val phase = remember { Animatable(0f) }
+    val grain = remember {
+        val random = Random(214)
+        val pixels = IntArray(384 * 512) {
+            (random.nextInt(5, 17) shl 24) or if (random.nextBoolean()) 0xFFFFFF else 0
         }
-        else -> when (hour) {
-            in 5..9 -> listOf(Color(0xFFC7D5E1), Color(0xFFE9E5E8), Color(0xFFF6E3D7))
-            in 10..16 -> listOf(Color(0xFFB7CDDC), Color(0xFFE0E8ED), Color(0xFFF8EEE8))
-            in 17..20 -> listOf(Color(0xFFC9CBDC), Color(0xFFE8D8DD), Color(0xFFF4DCCB))
-            else -> listOf(Color(0xFFB8C4D7), Color(0xFFD5DEEA), Color(0xFFE8E3EB))
+        android.graphics.Bitmap.createBitmap(pixels, 384, 512, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
+    }
+    LaunchedEffect(motion, foreground) {
+        if (motion && foreground) while (true) {
+            phase.animateTo((2 * PI).toFloat(), tween(160_000, easing = LinearEasing))
+            phase.snapTo(0f) // Both ends describe the same sin/cos positions.
         }
     }
-    val drift = remember { Animatable(0f) }
-    LaunchedEffect(motion) {
-        if (motion) while (true) { drift.animateTo(1f, tween(60_000, easing = LinearEasing)); drift.animateTo(0f, tween(60_000, easing = LinearEasing)) }
-    }
-    Canvas(Modifier.fillMaxSize()) {
-        drawRect(Brush.verticalGradient(palette))
-        val position = Offset(size.width * (.65f + drift.value * .12f), size.height * .14f)
-        drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = if (dark) .035f else .18f), Color.Transparent), position, size.width * .85f),
-            size.width * .85f, position)
-        val lower = Offset(size.width * (.1f + drift.value * .1f), size.height * .8f)
-        drawCircle(Brush.radialGradient(listOf(Color(0xFFF1B7A5).copy(alpha = if (dark) .035f else .12f), Color.Transparent), lower, size.width * .75f),
-            size.width * .75f, lower)
+    Canvas(Modifier.fillMaxSize().testTag("ambient-sky")) {
+        val t = phase.value // Read animation state during drawing, without recomposing the UI.
+        drawRect(Brush.linearGradient(
+            if (dark) listOf(Color(0xFF15253C), Color(0xFF243F5D), Color(0xFF101E33))
+            else listOf(Color(0xFFAACBE9), Color(0xFF85B2D8), Color(0xFFC5DFEE)),
+            start = Offset.Zero, end = Offset(size.width, size.height)))
+        fun haze(x: Float, y: Float, rx: Float, ry: Float, color: Color) {
+            withTransform({
+                translate(size.width * x, size.height * y)
+                scale(rx * size.width, ry * size.height, pivot = Offset.Zero)
+            }) {
+                drawCircle(Brush.radialGradient(
+                    0f to color, .28f to color.copy(alpha = color.alpha * .82f),
+                    .62f to color.copy(alpha = color.alpha * .30f), 1f to Color.Transparent,
+                    center = Offset.Zero, radius = 1f), radius = 1f, center = Offset.Zero)
+            }
+        }
+        val white = if (dark) Color(0xFFAACEE9).copy(alpha = .13f) else Color(0xFFF7FBFF).copy(alpha = .70f)
+        val blue = if (dark) Color(0xFF5B88B8).copy(alpha = .13f) else Color(0xFF6197C7).copy(alpha = .25f)
+        haze(.18f + .09f * sin(t), .13f + .05f * cos(t), .95f, .26f, white)
+        haze(.66f + .08f * cos(t + 1f), .32f + .06f * sin(t), .66f, .39f, blue)
+        haze(.30f + .10f * cos(t + 2f), .56f + .07f * sin(t + 1f), .85f, .30f, white)
+        haze(.85f + .06f * sin(t + 3f), .78f + .08f * cos(t), .70f, .36f, white.copy(alpha = white.alpha * .85f))
+        haze(.05f + .08f * cos(t), .95f + .07f * sin(t + 2f), .85f, .29f, blue)
+        drawImage(grain, dstSize = IntSize(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1)),
+            alpha = if (dark) .32f else .55f, filterQuality = FilterQuality.Low)
     }
 }
 
