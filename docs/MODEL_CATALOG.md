@@ -1,6 +1,6 @@
 # Model catalog
 
-This catalog contains one installable local ASR model. It is deliberately not a list of unverified mirrors.
+This catalog contains two installable, checksum-verified local ASR models. Choose the model in Speech recognition → Local models.
 
 ## `zipformer-bilingual-zh-en-2023-02-20-mobile`
 
@@ -53,3 +53,17 @@ The app additionally needs Apache Commons Compress for safe `.tar.bz2` extractio
 ## Still requiring CI/device verification
 
 This checkout deliberately does not install Android SDK/NDK/Gradle and does not run an Android build. CI must run `tools/prepare_sherpa.py`, compile the pinned Kotlin API/JNI inputs, and exercise `SherpaStreamingAsr` on an emulator. A physical device must still verify microphone capture, long-session power/OEM behavior, and recognition quality with real Chinese-English speech. The checksums and upstream API source are real; they are not a claim that this checkout has completed Android compilation or hardware testing.
+
+## `zipformer-en-2023-06-26-mobile`
+
+English-only streaming Zipformer, with INT8 encoder/joiner and FP32 decoder. Archive: [official mobile release](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-2023-06-26-mobile.tar.bz2), 305410008 bytes. Measured archive SHA-256: `4dad6f4849cad551042eb875505b3fdc0fac9f1c88d709165c48b921681e61dc`. Required installed weights total 70320726 bytes. Archive and individual file digests are pinned in `ModelCatalog.kt`; unused FP32 weights and test WAVs are excluded during installation. Upstream metadata selects the correct Zipformer runtime generation.
+
+## Cloud speech protocols
+
+- Doubao uses the existing live streaming ASR 2.0 protocol.
+- OpenAI and custom providers use multipart WAV uploads at `/audio/transcriptions`. Model ID is editable (default OpenAI `gpt-transcribe`).
+- Aliyun uses Qwen-ASR audio input at `/chat/completions`, default `qwen3-asr-flash`. Model ID and regional Base URL are editable.
+- HTTP providers send ordered chunks at silence boundaries after 2 seconds or at a 12-second maximum; pause/stop flush the remaining audio. Requests use a separate worker with a bounded in-memory queue. They do not provide word-level live partials, and a hard chunk boundary can split a word. Models must support the selected provider protocol.
+- API keys remain in separate encrypted `asr_*` namespaces, independent of translation credentials.
+
+References: [Qwen-ASR API](https://www.alibabacloud.com/help/en/model-studio/qwen-asr-api-reference), [OpenAI speech-to-text](https://developers.openai.com/api/docs/guides/speech-to-text).

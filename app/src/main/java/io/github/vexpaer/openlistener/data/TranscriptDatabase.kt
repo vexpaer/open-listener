@@ -99,8 +99,8 @@ abstract class TranscriptDatabase : RoomDatabase() {
     abstract fun sessionDao(): SessionDao
     abstract fun segmentDao(): SegmentDao
     companion object {
-        fun create(context: Context): TranscriptDatabase = Room.databaseBuilder(
-            context, TranscriptDatabase::class.java, "open_listener.db")
+        fun create(context: Context, name: String = "open_listener.db"): TranscriptDatabase = Room.databaseBuilder(
+            context, TranscriptDatabase::class.java, name)
             .addMigrations(object : androidx.room.migration.Migration(1, 2) {
                 override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE sessions ADD COLUMN audioPath TEXT DEFAULT NULL")

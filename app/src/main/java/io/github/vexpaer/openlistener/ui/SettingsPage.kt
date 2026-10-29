@@ -26,7 +26,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true, onSubpageChange: (Boolean) -> Unit = {}) {
+internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) {
     val prefs by model.preferences.collectAsState()
     val state by model.serviceState.collectAsState()
     val check by model.engineCheck.collectAsState()
@@ -43,7 +43,6 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true, 
     var font by remember(prefs.subtitleFontScale) { mutableFloatStateOf(prefs.subtitleFontScale) }
     LaunchedEffect(Unit) { model.refreshLanguageModels() }
     var page by rememberSaveable { mutableStateOf<String?>(null) }
-    LaunchedEffect(page) { onSubpageChange(page != null) }
     val sublist = key(page) { rememberLazyListState() }
     BackHandler(enabled = active && page != null) { page = null }
     Column(Modifier.fillMaxSize()) {

@@ -79,7 +79,6 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
         val pager = rememberPagerState { 3 }
         val scope = rememberCoroutineScope()
         val selected = if (route.startsWith("detail")) 1 else pager.currentPage
-        var settingsSubpage by remember { mutableStateOf(false) }
         val notice by viewModel.notice.collectAsState()
         val snackbar = remember { SnackbarHostState() }
         var entered by rememberSaveable { mutableStateOf(false) }
@@ -123,11 +122,11 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
                         popExitTransition = { fadeOut(tween(if (motion) 160 else 0)) }) {
                         composable("home") {
                             HorizontalPager(state = pager, beyondViewportPageCount = 2,
-                                userScrollEnabled = !(pager.currentPage == 2 && settingsSubpage), modifier = Modifier.fillMaxSize().testTag("main-pager")) { page ->
+                                modifier = Modifier.fillMaxSize().testTag("main-pager")) { page ->
                                 when (page) {
                                     0 -> ListenPage(viewModel, foreground && pager.currentPage == 0, onSettings = { navigateTop("settings") })
                                     1 -> LibraryPage(viewModel) { id -> nav.navigate("detail/$id") }
-                                    2 -> SettingsPage(viewModel, active = pager.currentPage == 2) { settingsSubpage = it }
+                                    2 -> SettingsPage(viewModel, active = pager.currentPage == 2)
                                 }
                             }
                         }
