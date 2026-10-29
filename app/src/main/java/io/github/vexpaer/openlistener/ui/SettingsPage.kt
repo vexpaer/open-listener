@@ -26,7 +26,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun SettingsPage(model: OpenListenerViewModel) {
+internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) {
     val prefs by model.preferences.collectAsState()
     val state by model.serviceState.collectAsState()
     val check by model.engineCheck.collectAsState()
@@ -44,20 +44,25 @@ internal fun SettingsPage(model: OpenListenerViewModel) {
     LaunchedEffect(Unit) { model.refreshLanguageModels() }
     var page by rememberSaveable { mutableStateOf<String?>(null) }
     val sublist = key(page) { rememberLazyListState() }
-    BackHandler(enabled = page != null) { page = null }
+    BackHandler(enabled = active && page != null) { page = null }
     Column(Modifier.fillMaxSize()) {
         page?.let { current ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { page = null }, modifier = Modifier.testTag("model-page-back")) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, tr("返回设置", "Back to settings"))
                 }
-                Text(when (current) {
-                    "asr-local" -> tr("语音识别 · 本地模型", "Speech · Local models")
-                    "asr-cloud" -> tr("语音识别 · 云端模型", "Speech · Cloud models")
-                    "translation-local" -> tr("文字翻译 · 本地模型", "Translation · Local models")
-                    else -> tr("文字翻译 · 云端模型", "Translation · Cloud models")
-                }, style = MaterialTheme.typography.titleMedium)
+                Text(if (current.startsWith("asr")) tr("语音识别", "Speech recognition") else tr("文字翻译", "Translation"), style = MaterialTheme.typography.titleMedium)
             }
+            val speech = current.startsWith("asr")
+            val local = current.endsWith("local")
+            ModelCategories(local, editingAllowed, if (speech) "asr" else "translation", onLocal = {
+                if (speech) model.setProviders("local", prefs.translationProvider) else model.setProviders(prefs.asrProvider, "mlkit")
+                page = if (speech) "asr-local" else "translation-local"
+            }, onCloud = {
+                if (speech && prefs.asrProvider == "local") model.setProviders("doubao", prefs.translationProvider)
+                if (!speech && prefs.translationProvider == "mlkit") model.setProviders(prefs.asrProvider, "doubao")
+                page = if (speech) "asr-cloud" else "translation-cloud"
+            })
         }
         LazyColumn(state = if (page == null) list else sublist,
             modifier = Modifier.weight(1f).testTag(if (page == null) "settings-page" else "settings-model-page"),
@@ -72,21 +77,29 @@ internal fun SettingsPage(model: OpenListenerViewModel) {
                 }
                 item {
                     SettingsSection(tr("语音识别", "Speech recognition"), Icons.Outlined.Mic) {
-                        ModelCategories(prefs.asrProvider == "local", editingAllowed, "asr", onLocal = {
-                            model.setProviders("local", prefs.translationProvider); page = "asr-local"
-                        }, onCloud = {
-                            model.setProviders("doubao", prefs.translationProvider); page = "asr-cloud"
-                        })
+                        OutlinedButton(onClick = { page = if (prefs.asrProvider == "local") "asr-local" else "asr-cloud" },
+                            modifier = Modifier.fillMaxWidth().testTag("asr-settings")) {
+                            Text(tr("识别引擎与模型", "Engines & models"), Modifier.weight(1f)); Icon(Icons.Outlined.ChevronRight, null)
+                        }
                     }
                 }
                 item {
                     SettingsSection(tr("文字翻译", "Translation"), Icons.Outlined.Language) {
-                        ModelCategories(prefs.translationProvider == "mlkit", editingAllowed, "translation", onLocal = {
-                            model.setProviders(prefs.asrProvider, "mlkit"); page = "translation-local"
-                        }, onCloud = {
-                            if (prefs.translationProvider == "mlkit") model.setProviders(prefs.asrProvider, "doubao")
-                            page = "translation-cloud"
-                        })
+                        OutlinedButton(onClick = { page = if (prefs.translationProvider == "mlkit") "translation-local" else "translation-cloud" },
+                            modifier = Modifier.fillMaxWidth().testTag("translation-settings")) {
+                            Text(tr("翻译引擎与模型", "Engines & models"), Modifier.weight(1f)); Icon(Icons.Outlined.ChevronRight, null)
+                        }
+                    }
+                }
+                item {
+                    SettingsSection(tr("录音保存", "Audio storage"), Icons.Outlined.Mic) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(tr("保留录音", "Keep recordings"))
+                                Hint(tr("开启后，新录音将随记录保存在此设备。", "Keep audio on this device for new sessions."))
+                            }
+                            Switch(prefs.retainAudio, model::setRetainAudio, enabled = editingAllowed, modifier = Modifier.testTag("retain-audio"))
+                        }
                     }
                 }
                 item {
@@ -132,7 +145,7 @@ internal fun SettingsPage(model: OpenListenerViewModel) {
                             Button(onClick = model::installUpdate, enabled = editingAllowed, modifier = Modifier.testTag("install-update")) { Text(tr("交给系统安装", "Install with Android")) }
                         }
                         if (!editingAllowed) Hint(tr("结束聆听后可更新", "Finish listening to update"))
-                        TextButton(onClick = { model.openUrl("https://github.com/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPOSITORY}") }) { Text(tr("开源代码 · Apache-2.0", "Source code · Apache-2.0")) }
+                        TextButton(onClick = { model.openUrl("https://github.com/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPOSITORY}") }) { Text("Github") }
                     }
                 }
             } else when (page) {
@@ -142,6 +155,8 @@ internal fun SettingsPage(model: OpenListenerViewModel) {
                             ReadingSurface {
                                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                     Text(manifest.displayName, style = MaterialTheme.typography.titleMedium)
+                                    FilterChip(prefs.localAsrModel == manifest.id, onClick = { model.setLocalAsrModel(manifest.id) },
+                                        enabled = editingAllowed, label = { Text(if (prefs.localAsrModel == manifest.id) tr("已选择", "Selected") else tr("选择模型", "Select model")) })
                                     Hint("${manifest.languages.joinToString(" / ")} · ${if (manifest.streaming) tr("真流式", "Streaming") else tr("分段识别", "Segmented")} · ${bytes(manifest.bytes)}")
                                     val status = modelStates[manifest.id]
                                     val phase = status?.phase ?: ModelPhase.NOT_INSTALLED
@@ -158,7 +173,7 @@ internal fun SettingsPage(model: OpenListenerViewModel) {
                                         OutlinedButton(onClick = { deleteModel = manifest.id }, enabled = editingAllowed && status?.inUse != true) { Text(tr("删除模型", "Delete model")) }
                                     } else {
                                         OutlinedButton(onClick = { model.downloadModel(manifest.id) }, enabled = editingAllowed,
-                                            modifier = Modifier.testTag("download-asr-model")) { Text(if (phase == ModelPhase.ERROR) tr("重试下载", "Retry download") else tr("下载模型", "Download model")) }
+                                            modifier = Modifier.testTag("download-asr-model-${manifest.id}")) { Text(if (phase == ModelPhase.ERROR) tr("重试下载", "Retry download") else tr("下载模型", "Download model")) }
                                     }
                                     status?.error?.let { ErrorText(it) }
                                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -178,18 +193,17 @@ internal fun SettingsPage(model: OpenListenerViewModel) {
                 }
                 "asr-cloud" -> item {
                     SettingsSection(tr("服务商", "Provider"), Icons.Outlined.Cloud) {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(prefs.asrProvider == "doubao", onClick = { model.setProviders("doubao", prefs.translationProvider) },
-                                enabled = editingAllowed, label = { Text(tr("豆包", "Doubao")) })
-                            FilterChip(false, onClick = {}, enabled = false, label = { Text(tr("阿里云 · 未支持", "Aliyun · Unavailable")) })
-                            FilterChip(false, onClick = {}, enabled = false, label = { Text(tr("OpenAI · 未支持", "OpenAI · Unavailable")) })
-                        }
+                        SettingChoice(tr("模型服务", "Model service"), listOf("doubao" to tr("豆包", "Doubao"),
+                            "qwen" to tr("阿里云", "Aliyun"), "openai" to "OpenAI", "custom" to tr("自定义", "Custom")),
+                            prefs.asrProvider, enabled = editingAllowed) { model.setProviders(it, prefs.translationProvider) }
+                        val provider = if (prefs.asrProvider == "doubao") "doubao" else "asr_${prefs.asrProvider}"
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { credentialsFor = "doubao" }, enabled = editingAllowed, modifier = Modifier.testTag("asr-credentials")) {
+                            OutlinedButton(onClick = { credentialsFor = provider }, enabled = editingAllowed, modifier = Modifier.testTag("asr-credentials")) {
                                 Text(tr("配置 API", "Configure API"))
                             }
-                            ApiHelpButton("asr-api-help") { guideFor = "doubao" }
+                            ApiHelpButton("asr-api-help") { guideFor = provider }
                         }
+                        Hint(tr("豆包为实时识别；其他服务按短音频分段识别。模型 ID 可自由填写，需支持所选接口。", "Doubao streams live; other providers transcribe short audio chunks. Enter any model ID supported by the selected API."))
                         OutlinedButton(onClick = model::checkSelectedEngines, enabled = !check.busy) {
                             Text(if (check.busy) tr("检查中…", "Checking…") else tr("检查配置", "Check setup"))
                         }
@@ -250,10 +264,11 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
     val defaultBase = when (provider) {
         "translation_doubao" -> "https://ark.cn-beijing.volces.com/api/v3"
         "translation_qwen" -> "https://dashscope.aliyuncs.com/compatible-mode/v1"
-        "translation_openai" -> "https://api.openai.com/v1"
+        "translation_openai", "asr_openai" -> "https://api.openai.com/v1"
+        "asr_qwen" -> "https://dashscope.aliyuncs.com/compatible-mode/v1"
         else -> ""
     }
-    val defaultModel = when (provider) { "translation_qwen" -> "qwen-plus"; "translation_openai" -> "gpt-4.1-mini"; else -> "" }
+    val defaultModel = when (provider) { "translation_qwen" -> "qwen-plus"; "translation_openai" -> "gpt-4.1-mini"; "asr_openai" -> "gpt-transcribe"; "asr_qwen" -> "qwen3-asr-flash"; else -> "" }
     // Deliberately not rememberSaveable: secrets must never enter Activity saved-state bundles.
     var key by remember(provider) { mutableStateOf(model.credential(provider, "api_key")) }
     var resource by remember(provider) { mutableStateOf(model.credential(provider, "resource_id")) }
@@ -262,7 +277,7 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
     val valid = key.isNotBlank() && if (asr) resource.isNotBlank() else base.startsWith("https://") && modelId.isNotBlank()
     AlertDialog(onDismissRequest = onDismiss, title = {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(if (asr) tr("豆包实时语音", "Doubao streaming speech") else tr("翻译 API", "Translation API"), modifier = Modifier.weight(1f))
+            Text(if (asr) tr("豆包实时语音", "Doubao streaming speech") else if (provider.startsWith("asr_")) tr("语音识别 API", "Speech API") else tr("翻译 API", "Translation API"), modifier = Modifier.weight(1f))
             ApiHelpButton("credentials-api-help", onHelp)
         }
     },
@@ -274,7 +289,7 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
                 else {
                     SecretField(base, { base = it }, "Base URL · HTTPS", false)
                     SecretField(modelId, { modelId = it }, "Model / Endpoint ID", false)
-                    Hint(tr("Base URL 为 API 根路径，不含 /chat/completions。豆包需填写自己的模型或 ep ID。", "Use the API root, without /chat/completions. Doubao requires your own model or ep ID."))
+                    Hint(if (provider.startsWith("asr_")) tr("填写 API 根路径和语音模型 ID。OpenAI / 自定义使用 /audio/transcriptions，阿里云使用 Qwen-ASR /chat/completions。", "Enter the API root and speech model ID. OpenAI / Custom use /audio/transcriptions; Aliyun uses Qwen-ASR /chat/completions.") else tr("Base URL 为 API 根路径，不含 /chat/completions。豆包需填写自己的模型或 ep ID。", "Use the API root, without /chat/completions. Doubao requires your own model or ep ID."))
                 }
             }
         }, confirmButton = {

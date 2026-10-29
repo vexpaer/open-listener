@@ -46,6 +46,7 @@ class TranslationQueueTest {
         override fun search(query: String) = kotlinx.coroutines.flow.emptyFlow<List<SessionEntity>>()
         override fun previews(query: String) = kotlinx.coroutines.flow.emptyFlow<List<SessionPreview>>()
         override suspend fun rename(id: String, title: String) = Unit
+        override suspend fun setAudioPath(id: String, path: String?) = Unit
         override suspend fun delete(id: String) = Unit
         override suspend fun markOrphanedAsInterrupted(now: Long) = Unit
     }

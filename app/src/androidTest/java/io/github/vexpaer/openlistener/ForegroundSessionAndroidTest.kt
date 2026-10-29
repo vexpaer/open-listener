@@ -26,6 +26,7 @@ class ForegroundSessionAndroidTest {
 
     @Test fun visibleStart_activityLeaves_lockScreen_notificationPauseResumeStop_preservesText() = runBlocking {
         app.recovery.await()
+        app.preferences.setRetainAudio(false)
         app.syntheticSession = true
         val activity = ActivityScenario.launch<MainActivity>(Intent(app, MainActivity::class.java))
         try {
@@ -61,6 +62,7 @@ class ForegroundSessionAndroidTest {
             assertTrue(stored.isNotEmpty())
             assertTrue(stored.all { it.translationStatus == "COMPLETED" })
             assertEquals("FINISHED", app.repository.getSession(id)!!.state)
+            assertNull(app.repository.getSession(id)!!.audioPath)
         } finally {
             shell("input keyevent 224")
             shell("wm dismiss-keyguard")
@@ -70,6 +72,40 @@ class ForegroundSessionAndroidTest {
             app.syntheticSession = false
         }
     }
+    @Test fun retainedAudioSurvivesPauseAndStop_andDeletionRemovesFile() = runBlocking {
+        app.recovery.await()
+        app.preferences.setRetainAudio(true)
+        app.preferences.setLanguages("en", "zh-CN")
+        app.syntheticSession = true
+        val activity = ActivityScenario.launch<MainActivity>(Intent(app, MainActivity::class.java))
+        try {
+            activity.onActivity { current ->
+                ContextCompat.startForegroundService(current, Intent(current, MicrophoneRecognitionService::class.java)
+                    .setAction(MicrophoneRecognitionService.ACTION_START))
+            }
+            await { RecognitionRuntime.state.value == MicrophoneRecognitionService.State.RECORDING }
+            val id = requireNotNull(RecognitionRuntime.sessionId.value)
+            await { app.repository.listSegments(id).isNotEmpty() }
+            app.startService(Intent(app, MicrophoneRecognitionService::class.java).setAction(MicrophoneRecognitionService.ACTION_PAUSE))
+            await { RecognitionRuntime.state.value == MicrophoneRecognitionService.State.PAUSED }
+            val file = java.io.File(requireNotNull(app.repository.getSession(id)!!.audioPath))
+            val pausedSize = file.length()
+            delay(300); assertEquals(pausedSize, file.length())
+            app.startService(Intent(app, MicrophoneRecognitionService::class.java).setAction(MicrophoneRecognitionService.ACTION_RESUME))
+            await { file.length() > pausedSize }
+            app.startService(Intent(app, MicrophoneRecognitionService::class.java).setAction(MicrophoneRecognitionService.ACTION_STOP))
+            await { RecognitionRuntime.state.value == MicrophoneRecognitionService.State.FINISHED }
+            val bytes = file.readBytes()
+            assertTrue(bytes.size > 44)
+            assertEquals(bytes.size - 44, java.nio.ByteBuffer.wrap(bytes, 40, 4).order(java.nio.ByteOrder.LITTLE_ENDIAN).int)
+            app.repository.deleteSession(id)
+            assertFalse(file.exists())
+        } finally {
+            app.startService(Intent(app, MicrophoneRecognitionService::class.java).setAction(MicrophoneRecognitionService.ACTION_STOP))
+            delay(200); activity.close(); app.syntheticSession = false; app.preferences.setRetainAudio(false)
+        }
+    }
+
     private fun shell(command: String) { instrumentation.uiAutomation.executeShellCommand(command).close() }
     private suspend fun await(condition: suspend () -> Boolean) = withTimeout(20_000) { while (!condition()) delay(50) }
 }

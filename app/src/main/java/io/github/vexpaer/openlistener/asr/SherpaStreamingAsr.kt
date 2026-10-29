@@ -27,9 +27,10 @@ class SherpaStreamingAsr(
     private val models: ModelStore,
     private val modelId: String = ModelStore.DEFAULT_ID
 ) : AsrEngine {
+    private val manifest = models.catalog.single { it.id == modelId }
     override val capabilities = AsrCapabilities(
-        providerId = "sherpa-onnx", displayName = "Offline Zipformer · 中文 / English",
-        streaming = true, languages = setOf("en", "zh-CN"), uploadsAudio = false
+        providerId = "sherpa-onnx", displayName = manifest.displayName,
+        streaming = true, languages = manifest.languages, uploadsAudio = false
     )
     @Volatile private var preparationError: String? = null
     @Volatile private var ready = false
@@ -38,7 +39,7 @@ class SherpaStreamingAsr(
             ready -> EngineAvailability.Ready
             preparationError != null -> EngineAvailability.Unavailable(requireNotNull(preparationError))
             models.isInstalled(modelId) -> EngineAvailability.Ready
-            else -> EngineAvailability.NeedsDownload("Download the verified Chinese / English Zipformer model")
+            else -> EngineAvailability.NeedsDownload("Download the selected verified Zipformer model")
         }
     private val output = Channel<TranscriptEvent>(Channel.RENDEZVOUS)
     override val events: Flow<TranscriptEvent> = output.receiveAsFlow()
@@ -61,13 +62,13 @@ class SherpaStreamingAsr(
             check(!closed) { "This recognition engine is closed" }
             if (recognizer != null) return@withLock EngineAvailability.Ready
             if (!models.isInstalled(modelId)) return@withLock EngineAvailability.NeedsDownload(
-                "Download the verified Chinese / English Zipformer model"
+                "Download the selected verified Zipformer model"
             )
             preparationError = null
             var acquired: ModelLease? = null
             try {
                 acquired = models.acquire(modelId)
-                recognizer = SherpaModelRuntime.create(acquired.directory)
+                recognizer = SherpaModelRuntime.create(acquired.directory, manifest)
                 lease = acquired
                 ready = true
                 EngineAvailability.Ready

@@ -23,6 +23,24 @@ import org.junit.runner.RunWith
 /** Network + JNI integration test, not a mock and never silently skipped. */
 @RunWith(AndroidJUnit4::class)
 class SherpaModelInstrumentedTest {
+    @Test fun englishModelInitializesAndDecodes() = runBlocking {
+        withTimeout(15 * 60_000L) {
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            val models = ModelStore(context)
+            val id = "zipformer-en-2023-06-26-mobile"
+            models.download(id)
+            val engine = SherpaStreamingAsr(models, id)
+            val collector = launch(start = CoroutineStart.UNDISPATCHED) { engine.events.collect {} }
+            try {
+                assertEquals(setOf("en"), engine.capabilities.languages)
+                assertEquals(EngineAvailability.Ready, engine.prepare())
+                engine.start("english-native-ci")
+                repeat(15) { engine.acceptPcm(ByteArray(3_200)) }
+                engine.flush(); engine.stop()
+            } finally { engine.close(); collector.cancelAndJoin() }
+        }
+    }
+
     @Test
     fun realBilingualModelDownloadsInitializesAndDecodesPcmWithoutAudioFiles() = runBlocking {
         withTimeout(15 * 60_000L) {

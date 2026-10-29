@@ -48,6 +48,25 @@ object ModelCatalog {
                 ModelFile("tokens.txt", 56_317,
                     "a8e0e4ec53810e433789b54a5c0134a7eaa2ffca595a6334d54c00da858841d3")
             )
+        ),
+        ModelManifest(
+            id = "zipformer-en-2023-06-26-mobile",
+            displayName = "Zipformer · English (INT8)",
+            version = "2023-06-26-mobile",
+            languages = setOf("en"), streaming = true,
+            license = "Apache-2.0",
+            licenseUrl = "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-en-2023-06-26/blob/main/README.md",
+            sourceUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models",
+            url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-2023-06-26-mobile.tar.bz2",
+            bytes = 305_410_008,
+            sha256 = "4dad6f4849cad551042eb875505b3fdc0fac9f1c88d709165c48b921681e61dc",
+            archiveRoot = "sherpa-onnx-streaming-zipformer-en-2023-06-26-mobile",
+            files = listOf(
+                ModelFile("joiner-epoch-99-avg-1-chunk-16-left-128.int8.onnx", 259416, "abd5e30f3f16fc510605c6029dba33f10e4386bd75c5bdc30cf94076864db10d"),
+                ModelFile("tokens.txt", 5048, "49e3c2646595fd907228b3c6787069658f67b17377c60aeb8619c4551b2316fb"),
+                ModelFile("encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx", 67963182, "ac01b68c61d1a716d90baea606b9683ddab07fbd097fc54398d19b027f390ef1"),
+                ModelFile("decoder-epoch-99-avg-1-chunk-16-left-128.onnx", 2093080, "85914f840b71110487ece7a30ebd0bd4b8fb5c2623215bba3aa5ab4c138fc591")
+            )
         )
     )
 }

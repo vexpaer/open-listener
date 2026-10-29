@@ -79,7 +79,7 @@ class ModelStore(context: Context) {
                 downloader.safeExtractTarBz2(archive, staging, model)
                 publish(model, ModelPhase.VALIDATING, model.bytes)
                 currentCoroutineContext().ensureActive()
-                SherpaModelRuntime.validate(staging)
+                SherpaModelRuntime.validate(staging, model)
                 currentCoroutineContext().ensureActive()
                 File(staging, MARKER).outputStream().use { stream ->
                     stream.write(model.sha256.toByteArray(Charsets.US_ASCII))

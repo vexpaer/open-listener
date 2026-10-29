@@ -2,6 +2,9 @@ package io.github.vexpaer.openlistener
 
 import android.content.Intent
 import android.graphics.Bitmap
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.performTextReplacement
@@ -48,6 +51,8 @@ class UiFlowTest {
         app.preferences.setLanguage("zh")
         app.preferences.setTheme("light")
         app.preferences.setReducedMotion(true)
+        app.preferences.setRetainAudio(false)
+        app.preferences.setLocalAsrModel(io.github.vexpaer.openlistener.models.ModelCatalog.DEFAULT_ID)
         app.preferences.setProviders("local", "mlkit")
         app.preferences.setLanguages("en", "zh-CN")
         app.models.catalog.forEach { app.models.delete(it.id) }
@@ -77,10 +82,10 @@ class UiFlowTest {
             compose.onNodeWithTag("tab-settings").performClick()
             compose.onNodeWithTag("settings-page").assertIsDisplayed()
             screenshot("03-settings-overview")
-            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("asr-local-models"))
-            compose.onNodeWithTag("asr-local-models").performClick()
-            compose.onNodeWithTag("settings-model-page").performScrollToNode(hasTestTag("download-asr-model"))
-            compose.onNodeWithTag("download-asr-model").assertIsDisplayed().assertIsEnabled()
+            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("asr-settings"))
+            compose.onNodeWithTag("asr-settings").performClick()
+            compose.onNodeWithTag("settings-model-page").performScrollToNode(hasTestTag("download-asr-model-zipformer-bilingual-zh-en-2023-02-20-mobile"))
+            compose.onNodeWithTag("download-asr-model-zipformer-bilingual-zh-en-2023-02-20-mobile").assertIsDisplayed().assertIsEnabled()
             screenshot("04-settings-models")
             compose.onNodeWithTag("model-page-back").performClick()
             compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("check-updates"))
@@ -131,7 +136,8 @@ class UiFlowTest {
             val textLayout = mutableListOf<TextLayoutResult>()
             compose.onNodeWithText("目标语言").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(textLayout) }
             assertEquals(Color(0xFFF5F6FA), textLayout.single().layoutInput.style.color)
-            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("asr-cloud-models"))
+            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("asr-settings"))
+            compose.onNodeWithTag("asr-settings").performClick()
             compose.onNodeWithTag("asr-cloud-models").performClick()
             compose.onNodeWithTag("asr-credentials").assertIsDisplayed()
             compose.onNodeWithTag("asr-api-help").performClick()
@@ -139,9 +145,11 @@ class UiFlowTest {
             compose.onNodeWithTag("api-guide-link-0").assertHasClickAction()
             compose.onNodeWithText("https://console.volcengine.com/speech/new/setting/apikeys").assertIsDisplayed()
             compose.onNodeWithTag("api-guide-back").performClick()
-            compose.onNodeWithText("阿里云 · 未支持").assertIsNotEnabled()
+            compose.onNodeWithText("阿里云").assertIsEnabled()
+            compose.onNodeWithText("OpenAI").assertIsEnabled()
             compose.onNodeWithTag("model-page-back").performClick()
-            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("translation-cloud-models"))
+            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("translation-settings"))
+            compose.onNodeWithTag("translation-settings").performClick()
             compose.onNodeWithTag("translation-cloud-models").performClick()
             compose.onNodeWithText("阿里云").performClick()
             compose.waitUntil(10_000) { runBlocking { app.preferences.preferences.first().translationProvider == "qwen" } }
@@ -156,7 +164,8 @@ class UiFlowTest {
             compose.onNodeWithText("Model / Endpoint ID").assertTextContains("test-only-draft-model")
             compose.onNodeWithText("取消").performClick()
             compose.onNodeWithTag("model-page-back").performClick()
-            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("translation-local-models"))
+            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("translation-settings"))
+            compose.onNodeWithTag("translation-settings").performClick()
             compose.onNodeWithTag("translation-local-models").performClick()
             compose.onNodeWithTag("download-language-models").assertIsDisplayed()
             compose.onNodeWithTag("model-page-back").performClick()
@@ -165,6 +174,22 @@ class UiFlowTest {
             compose.onNodeWithTag("listen-primary").assertWidthIsEqualTo(80.dp).assertHeightIsEqualTo(80.dp)
             compose.onNodeWithTag("stop-listening").assertWidthIsEqualTo(80.dp).assertHeightIsEqualTo(80.dp)
             screenshot("07-dark-matching-controls")
+        }
+    }
+
+    @Test fun swipeTabs_andKeepAudioDefaultOff() {
+        reset()
+        ActivityScenario.launch<MainActivity>(Intent(app, MainActivity::class.java)).use {
+            compose.onNodeWithTag("main-pager").performTouchInput { swipeLeft() }
+            compose.onNodeWithTag("library-page").assertIsDisplayed()
+            compose.onNodeWithTag("main-pager").performTouchInput { swipeLeft() }
+            compose.onNodeWithTag("settings-page").assertIsDisplayed()
+            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("retain-audio"))
+            assertEquals(false, runBlocking { app.preferences.preferences.first().retainAudio })
+            compose.onNodeWithTag("retain-audio").performClick()
+            compose.waitUntil(5_000) { runBlocking { app.preferences.preferences.first().retainAudio } }
+            compose.onNodeWithTag("main-pager").performTouchInput { swipeRight() }
+            compose.onNodeWithTag("library-page").assertIsDisplayed()
         }
     }
 

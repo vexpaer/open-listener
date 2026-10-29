@@ -15,7 +15,12 @@ open class OpenListenerApp : Application() {
     val credentials by lazy { CredentialsStore(this) }
     val models by lazy { ModelStore(this) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    val recovery by lazy { scope.async { repository.markInterruptedSessions() } }
+    val recovery by lazy { scope.async {
+        java.io.File(filesDir, "recordings").listFiles()?.filter { it.extension == "wav" }?.forEach {
+            io.github.vexpaer.openlistener.audio.WavAudio.repair(it)
+        }
+        repository.markInterruptedSessions()
+    } }
 
     override fun onCreate() {
         super.onCreate()
@@ -28,8 +33,9 @@ open class OpenListenerApp : Application() {
     open fun newCapture(): io.github.vexpaer.openlistener.audio.PcmCapture = io.github.vexpaer.openlistener.audio.AudioPcmCapture()
 
     open fun newAsr(prefs: AppPreferences): AsrEngine = when (prefs.asrProvider) {
-        "local" -> SherpaStreamingAsr(models)
+        "local" -> SherpaStreamingAsr(models, prefs.localAsrModel)
         "doubao" -> DoubaoRealtimeAsr(credentials)
+        "qwen", "openai", "custom" -> CloudChunkAsr(prefs.asrProvider, credentials, prefs.sourceLanguage)
         else -> error("Unsupported speech provider; select a supported engine in Settings")
     }
     open fun newTranslator(prefs: AppPreferences): TranslationEngine = when (prefs.translationProvider) {
