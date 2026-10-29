@@ -45,7 +45,6 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
     val state by model.serviceState.collectAsState()
     val segments by model.liveSegments.collectAsState()
     val partial by model.partial.collectAsState()
-    val elapsed by model.elapsedMs.collectAsState()
     val rms by model.level.collectAsState()
     val error by model.serviceError.collectAsState()
     val check by model.engineCheck.collectAsState()
@@ -67,18 +66,12 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
     }
     Column(Modifier.fillMaxSize().testTag("listen-page")) {
         if (active || segments.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("${stateLabel(state)} · ${formatTime(elapsed)}", style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(if (prefs.asrProvider == "local") tr("设备端识别", "On-device speech") else tr("云端识别", "Cloud speech"),
-                    style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
             DisplayModes(mode, { mode = it })
         }
         if (error != null) ErrorText(error.orEmpty())
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
-                count > 0 -> ReadingSurface {
+                count > 0 -> ReadingSurface(backgroundAlpha = .2f) {
                     LazyColumn(state = list, modifier = Modifier.fillMaxSize().testTag("live-transcript"),
                         contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
                         items(segments, key = { "final-${it.sequence}" }) { segment ->
@@ -94,9 +87,6 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
                     Icon(Icons.Outlined.GraphicEq, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(20.dp))
                     Text(tr("听见课堂，\n读懂每一句。", "Your lecture,\nin both languages."), style = MaterialTheme.typography.headlineLarge)
-                    Spacer(Modifier.height(14.dp))
-                    Text(tr("只留下文字，不留下录音。", "Keep the words. Never the audio."), style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(24.dp))
                     if (check.busy) Text(tr("正在检查所选引擎…", "Checking selected engines…"), style = MaterialTheme.typography.bodyMedium)
                     else if (!check.ready) {
@@ -128,8 +118,11 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
                         if (state == State.RECORDING) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
                         level = if (foreground && state == State.RECORDING) rms else 0f,
                         onClick = if (state == State.RECORDING) model::pauseListening else model::resumeListening)
-                    OutlinedButton(onClick = model::stopListening, modifier = Modifier.heightIn(min = 52.dp).testTag("stop-listening")) {
-                        Icon(Icons.Outlined.Stop, null, Modifier.size(20.dp)); Spacer(Modifier.width(6.dp)); Text(tr("结束", "Finish"))
+                    Box(Modifier.size(100.dp), contentAlignment = Alignment.Center) {
+                        OutlinedButton(onClick = model::stopListening, shape = CircleShape,
+                            contentPadding = PaddingValues(0.dp), modifier = Modifier.size(80.dp).testTag("stop-listening")) {
+                            Icon(Icons.Outlined.Stop, tr("结束", "Finish"), Modifier.size(30.dp))
+                        }
                     }
                 }
                 else -> ListeningButton(tr("开始聆听", "Start listening"), Icons.Outlined.Mic, 0f, !check.busy, model::startListening)
@@ -180,7 +173,6 @@ private fun TranscriptParagraph(segment: SegmentEntity, mode: TranscriptMode, fo
     val fade by animateFloatAsState(if (revealed) 1f else .3f, tween(if (motion) 200 else 0), label = "translation-arrival")
     Column(Modifier.fillMaxWidth().combinedClickable(onClick = {}, onLongClick = { onCopy(listOfNotNull(segment.original, segment.translated).joinToString("\n")) }),
         verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(formatTime(segment.startOffsetMs), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (mode != TranscriptMode.TRANSLATION) SelectionContainer {
             Text(segment.original, style = MaterialTheme.typography.bodyLarge.copy(fontSize = (17 * fontScale).sp, lineHeight = (27 * fontScale).sp))
         }
@@ -205,7 +197,6 @@ private fun PartialParagraph(event: TranscriptEvent, mode: TranscriptMode, fontS
     if (mode == TranscriptMode.TRANSLATION) return
     val opacity by animateFloatAsState(.68f, tween(if (LocalMotionAllowed.current) 160 else 0), label = "partial-opacity")
     Column(Modifier.alpha(opacity), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("${formatTime(event.startOffsetMs)} · ${tr("识别中", "Recognizing")}", style = MaterialTheme.typography.labelSmall)
         Text(event.text, style = MaterialTheme.typography.bodyLarge.copy(fontSize = (17 * fontScale).sp, lineHeight = (27 * fontScale).sp))
     }
 }
@@ -217,7 +208,7 @@ internal fun LibraryPage(model: OpenListenerViewModel, onOpen: (String) -> Unit)
     val list = rememberLazyListState()
     Column(Modifier.fillMaxSize().testTag("library-page"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OutlinedTextField(value = query, onValueChange = { query = it; model.searchQuery.value = it },
-            label = { Text(tr("搜索标题、原文或译文", "Search titles and transcript")) }, singleLine = true,
+            label = { Text(tr("搜索", "Search")) }, singleLine = true,
             leadingIcon = { Icon(Icons.Outlined.Search, null) },
             trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = ""; model.searchQuery.value = "" }) { Icon(Icons.Outlined.Close, tr("清除搜索", "Clear search")) } },
             modifier = Modifier.fillMaxWidth().testTag("library-search"), shape = RoundedCornerShape(18.dp))
@@ -226,14 +217,15 @@ internal fun LibraryPage(model: OpenListenerViewModel, onOpen: (String) -> Unit)
             if (query.isBlank()) tr("结束聆听后，已确认的文字会留在这里。", "Confirmed words will be here after you finish listening.")
             else tr("试试其他标题或正文关键词。", "Try another title or phrase."), modifier = Modifier.weight(1f).testTag("library-empty"))
         else LazyColumn(state = list, modifier = Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
-            items(sessions, key = { it.id }) { session ->
-                Surface(onClick = { onOpen(session.id) }, color = MaterialTheme.colorScheme.surface.copy(alpha = .75f), shape = RoundedCornerShape(18.dp),
+            items(sessions, key = { it.session.id }) { entry ->
+                val session = entry.session
+                Surface(onClick = { onOpen(session.id) }, color = MaterialTheme.colorScheme.surface.copy(alpha = .75f), contentColor = MaterialTheme.colorScheme.onSurface, shape = RoundedCornerShape(18.dp),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                         Text(session.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text("${date(session.startedAt)} · ${formatTime(session.durationMs)}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("${languageName(session.sourceLang)} → ${languageName(session.targetLang)} · ${sessionStatus(session.state)}", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(entry.preview.ifBlank { tr("暂无转录内容", "No transcript yet") }.lineSequence().joinToString(" "),
+                            style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("session-preview-${session.id}"))
                     }
                 }
             }
@@ -301,8 +293,9 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
     "FINISHED", "COMPLETED" -> tr("已完成", "Finished"); "INTERRUPTED", "ERROR" -> tr("已中断", "Interrupted")
     "PAUSED" -> tr("已暂停", "Paused"); else -> tr("进行中", "In progress")
 }
-@Composable internal fun ReadingSurface(content: @Composable () -> Unit) {
-    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = .86f), content = content)
+@Composable internal fun ReadingSurface(backgroundAlpha: Float = .86f, content: @Composable () -> Unit) {
+    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = backgroundAlpha),
+        contentColor = MaterialTheme.colorScheme.onSurface, content = content)
 }
 @Composable internal fun ErrorText(message: String) {
     Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp))

@@ -6,6 +6,7 @@ import java.util.UUID
 class SessionRepository(private val sessions: SessionDao, private val segments: SegmentDao) {
     fun observeSessions(): Flow<List<SessionEntity>> = sessions.observeAll()
     fun search(query: String): Flow<List<SessionEntity>> = sessions.search(query.trim())
+    fun previews(query: String): Flow<List<SessionPreview>> = sessions.previews(query.trim())
     fun observeSegments(sessionId: String): Flow<List<SegmentEntity>> = segments.observeForSession(sessionId)
     suspend fun startSession(title: String, sourceLang: String, targetLang: String,
         asrProvider: String, translatorProvider: String, now: Long = System.currentTimeMillis()): String {

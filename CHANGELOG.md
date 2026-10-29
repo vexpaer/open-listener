@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3 — 2026-10-30
+
+- Use matching icon-only pause/resume and transparent stop controls.
+- Remove listening status, timestamps and redundant introductory copy; use a 20% opacity live transcript surface.
+- Show titles with a single-line transcript preview in Library and simplify Search.
+- Group speech and translation settings into Local models / Cloud models detail pages.
+- Reduce settings copy and fix inherited black text on translucent dark-theme surfaces.
+
 ## 0.1.2 — 2026-10-30
 
 - Remove the top wordmark/status row and move navigation upward.
