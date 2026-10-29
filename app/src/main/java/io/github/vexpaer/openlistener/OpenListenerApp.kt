@@ -1,0 +1,41 @@
+package io.github.vexpaer.openlistener
+
+import android.app.Application
+import io.github.vexpaer.openlistener.asr.*
+import io.github.vexpaer.openlistener.data.*
+import io.github.vexpaer.openlistener.models.ModelStore
+import io.github.vexpaer.openlistener.security.CredentialsStore
+import io.github.vexpaer.openlistener.translation.*
+import kotlinx.coroutines.*
+
+open class OpenListenerApp : Application() {
+    val database by lazy { TranscriptDatabase.create(this) }
+    val repository by lazy { SessionRepository(database.sessionDao(), database.segmentDao()) }
+    val preferences by lazy { PreferencesStore(this) }
+    val credentials by lazy { CredentialsStore(this) }
+    val models by lazy { ModelStore(this) }
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val recovery by lazy { scope.async { repository.markInterruptedSessions() } }
+
+    override fun onCreate() {
+        super.onCreate()
+        recovery.start()
+        scope.launch {
+            val cutoff = System.currentTimeMillis() - 24 * 60 * 60 * 1000
+            java.io.File(cacheDir, "exports").listFiles()?.filter { it.lastModified() < cutoff }?.forEach { it.delete() }
+        }
+    }
+    open fun newAsr(prefs: AppPreferences): AsrEngine = when (prefs.asrProvider) {
+        "local" -> SherpaStreamingAsr(models)
+        "doubao" -> DoubaoRealtimeAsr(credentials)
+        else -> error("Unsupported speech provider; select a supported engine in Settings")
+    }
+    open fun newTranslator(prefs: AppPreferences): TranslationEngine = when (prefs.translationProvider) {
+        "mlkit" -> MlKitTranslation(prefs.sourceLanguage, prefs.targetLanguage)
+        "doubao" -> CloudTextTranslation(CloudTranslationProvider.DOUBAO_ARK, credentials)
+        "qwen" -> CloudTextTranslation(CloudTranslationProvider.QWEN, credentials)
+        "openai" -> CloudTextTranslation(CloudTranslationProvider.OPENAI, credentials)
+        "custom" -> CloudTextTranslation(CloudTranslationProvider.CUSTOM, credentials)
+        else -> error("Unsupported translation provider; select a supported engine in Settings")
+    }
+}

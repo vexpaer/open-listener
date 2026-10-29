@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Open Listener</string>
+    <string name="notification_channel_name">Live listening</string>
+    <string name="notification_channel_description">Controls for an active listening session</string>
+</resources>
