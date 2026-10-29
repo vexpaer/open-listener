@@ -110,11 +110,7 @@ class MicrophoneRecognitionService : Service() {
             errors = scope.launch { cloud.errors.collect { error -> if (error != null && !terminating) reportFailure(error) } }
         }
         engine!!.start(id!!)
-        consumer = scope.launch {
-            try { for (frame in capture.audioFrames) engine!!.acceptPcm(frame) }
-            catch (e: CancellationException) { throw e }
-            catch (e: Exception) { reportFailure(e) }
-        }
+        startConsumer()
         acquireWakeLock()
         capture.start(scope, RecognitionRuntime::updateLevel, ::reportFailure)
         setState(State.RECORDING)
@@ -128,8 +124,18 @@ class MicrophoneRecognitionService : Service() {
         }
         app.repository.finishSession(id!!, "RECORDING", 0, null)
     }
+    private fun startConsumer() {
+        val input = capture.audioFrames
+        consumer = scope.launch {
+            try { for (frame in input) engine!!.acceptPcm(frame) }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { reportFailure(e) }
+        }
+    }
     private suspend fun pause() {
         capture.stop()
+        capture.audioFrames.close()
+        withTimeout(5_000) { consumer?.join() }
         engine!!.pause()
         releaseWakeLock()
         setState(State.PAUSED)
@@ -138,6 +144,8 @@ class MicrophoneRecognitionService : Service() {
     private suspend fun resume() {
         check(ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) { "Microphone permission was revoked" }
         engine!!.resume()
+        capture = app.newCapture()
+        startConsumer()
         acquireWakeLock()
         capture.start(scope, RecognitionRuntime::updateLevel, ::reportFailure)
         setState(State.RECORDING)

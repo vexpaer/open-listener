@@ -33,5 +33,11 @@ object RecognitionRuntime {
     fun updateLevel(value: Float) { _level.value = .7f * _level.value + .3f * value }
     fun updatePartial(value: TranscriptEvent?) { _partial.value = value }
     fun fail(message: String) { _error.value = message; updateState(MicrophoneRecognitionService.State.ERROR) }
-    fun end() { tick(); _partial.value = null; _level.value = 0f }
+    fun end() {
+        tick()
+        _partial.value = null
+        _level.value = 0f
+        _sessionId.value = null
+        startedElapsed = 0L
+    }
 }
