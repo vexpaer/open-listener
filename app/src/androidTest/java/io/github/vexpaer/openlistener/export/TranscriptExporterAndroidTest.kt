@@ -117,6 +117,10 @@ class TranscriptExporterAndroidTest {
             if (fail) throw IOException("Synthetic SAF flush failure")
             super.flush()
         }
-        override fun close() { closed = true; super.close() }
+        override fun close() {
+            closed = true
+            super.close()
+            if (fail) throw IOException("Synthetic SAF close failure")
+        }
     }
 }
