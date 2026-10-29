@@ -1,13 +1,12 @@
-## Open Listener 0.1.0
+## Open Listener 0.1.2
 
-Native Android live bilingual notes with text-only history, explicit local/cloud data paths, verified offline Zipformer installation, ML Kit on-device translation, Doubao streaming protocol and BYOK cloud text translation.
+- 顶部移除品牌与状态文字，三个导航按钮上移。
+- 导航外框及滑动选中底色改为胶囊形，移除点击时的深色反馈。
+- 设置顶部新增“目标语言”，集中放置语音源语言与翻译目标。
+- 主题、界面语言及字幕字号移至下方“外观”；移除跟随系统选项和减少动态效果开关。
+- 移除“隐私与存储”设置卡片。
+- 录音页移除语言方向、底部隐私文字及开始/暂停/继续文字，保留操作图标。
 
 ### Install
 
-Download `OpenListener-v0.1.0-universal.apk` (ARM64 + x86_64), compare SHA256SUMS, then use the Android system installer. Android 8/API 26+ required. Models are downloaded separately in Settings. Runtime provider keys are never bundled.
-
-### Boundaries
-
-Cloud provider adapters require the user's own active credentials. Mock protocol tests are not real-account validation. Model initialization and synthetic PCM tests do not certify recognition accuracy. Physical-device microphone continuity, phone/Bluetooth routing and manufacturer screen-off policies still require the documented manual checklist. Aliyun/OpenAI realtime ASR are not delivered in this release; their text translation presets are independent.
-
-The app never stores original microphone audio. Selecting cloud recognition uploads PCM to that provider; selecting cloud translation uploads confirmed text. ML Kit is proprietary, while application source is Apache-2.0.
+Android 8+ · Download `OpenListener-v0.1.2-arm64-v8a.apk` for an ARM64 phone, or `OpenListener-v0.1.2-universal.apk` for ARM64/x86_64. Existing installations can use Settings → Check for updates. The release uses the existing signing key and includes SHA256SUMS and update.json.

@@ -18,7 +18,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.vexpaer.openlistener.BuildConfig
-import io.github.vexpaer.openlistener.data.AppPreferences
+import io.github.vexpaer.openlistener.ui.theme.LocalDarkAppearance
 import io.github.vexpaer.openlistener.models.ModelPhase
 import java.util.Locale
 
@@ -42,22 +42,9 @@ internal fun SettingsPage(model: OpenListenerViewModel) {
     LazyColumn(state = list, modifier = Modifier.fillMaxSize().testTag("settings-page"),
         verticalArrangement = Arrangement.spacedBy(24.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
         item {
-            SettingsSection(tr("使用体验", "Experience"), Icons.Outlined.WbSunny) {
-                SettingChoice(tr("主题", "Appearance"), listOf("system" to tr("跟随系统", "System"), "light" to tr("浅色", "Light"), "dark" to tr("深色", "Dark")), prefs.theme, model::setTheme)
-                SettingChoice(tr("界面语言", "App language"), listOf("system" to tr("跟随系统", "System"), "zh" to "简体中文", "en" to "English"), prefs.appLanguage, model::setLanguage)
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Column(Modifier.weight(1f)) {
-                        Text(tr("减少动态效果", "Reduce motion"))
-                        Hint(tr("关闭天空漂移与过渡动画", "Stop sky drift and animated transitions"))
-                    }
-                    Switch(prefs.reducedMotion, model::setReducedMotion, modifier = Modifier.testTag("reduced-motion"))
-                }
-                Text("${tr("字幕字号", "Subtitle size")} · ${(font * 100).toInt()}%", style = MaterialTheme.typography.labelLarge)
-                Slider(font, { font = it }, valueRange = .85f..1.5f, steps = 12,
-                    onValueChangeFinished = { model.setSubtitleFontScale(font) }, modifier = Modifier.testTag("subtitle-size"))
-                Hint(tr("在系统字体缩放的基础上调整。", "Applied in addition to the system font size."))
+            SettingsSection(tr("目标语言", "Target language"), Icons.Outlined.Language) {
                 LanguageChoice(tr("语音源语言", "Spoken language"), prefs.sourceLanguage, editingAllowed) { model.setLanguages(it, prefs.targetLanguage) }
-                LanguageChoice(tr("翻译目标语言", "Translation language"), prefs.targetLanguage, editingAllowed) { model.setLanguages(prefs.sourceLanguage, it) }
+                LanguageChoice(tr("翻译目标", "Translation target"), prefs.targetLanguage, editingAllowed) { model.setLanguages(prefs.sourceLanguage, it) }
                 if (!editingAllowed) Hint(tr("引擎与语言在当前聆听结束后可修改。", "You can change engines and languages after ending this session."))
             }
         }
@@ -148,12 +135,15 @@ internal fun SettingsPage(model: OpenListenerViewModel) {
             }
         }
         item {
-            SettingsSection(tr("隐私与存储", "Privacy & storage"), Icons.Outlined.Lock) {
-                Text(tr("音频从不保存", "Audio is never saved"), style = MaterialTheme.typography.titleMedium)
-                Hint(tr("PCM 只经过有界内存；本机仅保留确认后的文字、偏好和下载的模型。导出分享缓存 24 小时后清理。", "PCM passes through bounded memory only. This device keeps confirmed text, preferences and downloaded models. Share documents expire after 24 hours."))
-                Text(dataPath(prefs), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                Hint(tr("息屏后识别由前台服务继续；系统或厂商强制停止可能中断，但已确认文字不会因此删除。", "The foreground service continues while the screen is off. OS or manufacturer restrictions may interrupt it; confirmed text remains."))
-                TextButton(onClick = { model.openUrl("https://github.com/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPOSITORY}/blob/main/PRIVACY.md") }) { Text(tr("阅读隐私说明", "Privacy policy")) }
+            SettingsSection(tr("外观", "Appearance"), Icons.Outlined.WbSunny) {
+                SettingChoice(tr("主题", "Theme"), listOf("light" to tr("浅色", "Light"), "dark" to tr("深色", "Dark")),
+                    if (LocalDarkAppearance.current) "dark" else "light", model::setTheme)
+                SettingChoice(tr("界面语言", "App language"), listOf("zh" to "简体中文", "en" to "English"),
+                    if (LocalChinese.current) "zh" else "en", model::setLanguage)
+                Text("${tr("字幕字号", "Subtitle size")} · ${(font * 100).toInt()}%", style = MaterialTheme.typography.labelLarge)
+                Slider(font, { font = it }, valueRange = .85f..1.5f, steps = 12,
+                    onValueChangeFinished = { model.setSubtitleFontScale(font) }, modifier = Modifier.testTag("subtitle-size"))
+                Hint(tr("在系统字体缩放的基础上调整。", "Applied in addition to the system font size."))
             }
         }
         item {
@@ -171,6 +161,9 @@ internal fun SettingsPage(model: OpenListenerViewModel) {
                     updates.checked && updates.update == null -> Text(tr("已是最新版本。", "You're up to date."), style = MaterialTheme.typography.bodyMedium)
                     updates.update != null -> {
                         Text("${tr("可用版本", "Available")}: ${updates.update?.versionName}", style = MaterialTheme.typography.labelLarge)
+                        updates.update?.let { update ->
+                            Hint("${tr("自动匹配安装包", "Matched APK")}: ${update.abi} · ${bytes(update.apk.size)}")
+                        }
                         updates.update?.notes?.takeIf { it.isNotBlank() }?.let { notes -> Text(notes, style = MaterialTheme.typography.bodySmall) }
                     }
                 }
@@ -293,12 +286,6 @@ private fun LanguageChoice(title: String, value: String, enabled: Boolean, onSel
     AlertDialog(onDismissRequest = onDismiss, title = { Text(title) }, text = { Text(body) },
         confirmButton = { TextButton(onClick = onConfirm) { Text(tr("删除", "Delete"), color = MaterialTheme.colorScheme.error) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(tr("保留", "Keep")) } })
-}
-@Composable private fun dataPath(prefs: AppPreferences): String = when {
-    prefs.asrProvider == "local" && prefs.translationProvider == "mlkit" -> tr("全设备端 · 不上传音频或文字", "On-device · No audio or text upload")
-    prefs.asrProvider != "local" && prefs.translationProvider != "mlkit" -> tr("上传音频 + 上传已确认文字", "Audio + confirmed text are uploaded")
-    prefs.asrProvider != "local" -> tr("上传音频 · 文字在设备端翻译", "Audio uploaded · Translation on-device")
-    else -> tr("音频留在设备 · 上传已确认文字", "Audio stays on-device · Confirmed text uploaded")
 }
 @Composable private fun phaseLabel(phase: ModelPhase): String = when (phase) {
     ModelPhase.NOT_INSTALLED -> tr("未安装", "Not installed"); ModelPhase.DOWNLOADING -> tr("下载中", "Downloading")

@@ -66,12 +66,6 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
         if (following && count > 0 && !list.isScrollInProgress) list.scrollToItem(count - 1)
     }
     Column(Modifier.fillMaxSize().testTag("listen-page")) {
-        TextButton(onClick = onSettings, contentPadding = PaddingValues(horizontal = 0.dp), modifier = Modifier.heightIn(min = 48.dp)) {
-            Icon(Icons.Outlined.Language, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("${languageName(prefs.sourceLanguage)}  →  ${languageName(prefs.targetLanguage)}")
-            Spacer(Modifier.width(8.dp)); Icon(Icons.Outlined.ExpandMore, null, Modifier.size(18.dp))
-        }
         if (active || segments.isNotEmpty()) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("${stateLabel(state)} · ${formatTime(elapsed)}", style = MaterialTheme.typography.labelMedium,
@@ -140,10 +134,6 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
                 }
                 else -> ListeningButton(tr("开始聆听", "Start listening"), Icons.Outlined.Mic, 0f, !check.busy, model::startListening)
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(Icons.Outlined.Lock, null, Modifier.size(13.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(tr("音频从不保存", "Audio is never saved."), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
         }
     }
 }
@@ -166,7 +156,6 @@ private fun ListeningButton(label: String, icon: androidx.compose.ui.graphics.ve
                 Icon(icon, contentDescription = label, modifier = Modifier.size(30.dp))
             }
         }
-        Text(label, style = MaterialTheme.typography.labelLarge)
     }
 }
 

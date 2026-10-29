@@ -1,6 +1,21 @@
 # Changelog
 
-## 0.1.0 — Unreleased
+## 0.1.2 — 2026-10-30
+
+- Remove the top wordmark/status row and move navigation upward.
+- Use capsule navigation and a sliding capsule indicator without pressed shading.
+- Move spoken/translation language choices to the first Target language section.
+- Move theme, app language and subtitle size into Appearance; remove system-choice and reduced-motion controls.
+- Remove the Privacy & storage card and redundant listening labels.
+
+## 0.1.1 — 2026-10-30
+
+- Replace the launcher and documentation logo with the supplied Open Listener artwork.
+- Publish Universal (ARM64 + x86_64) and smaller ARM64 APKs using the same stable signing certificate.
+- Select the compatible update APK automatically, with per-artifact SHA-256/size checks and a Universal fallback for v0.1.0 clients.
+- Display the selected APK architecture and download size in Settings.
+
+## 0.1.0 — 2026-10-29
 
 - Native Android Compose shell with top Listen / Library / Settings tabs.
 - Text-only Room history, search, copy, rename, delete, Markdown/PDF export and sharing paths.

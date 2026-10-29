@@ -53,6 +53,22 @@ class GitHubReleaseUpdaterAndroidTest {
         assertEquals(metadata.sha256, result.sha256)
     }
 
+    @Test fun checkSelectsArm64AndUniversalFromTheSameRelease() = runBlocking {
+        val arm = apk.copy(name = "OpenListener-arm64-v8a.apk", browser_download_url = "$base/OpenListener-arm64-v8a.apk", size = 2)
+        val meta = metadata.copy(artifacts = listOf(
+            UpdateArtifactMetadata("universal", apk.name, metadata.sha256, apk.size, listOf("arm64-v8a", "x86_64")),
+            UpdateArtifactMetadata("arm64-v8a", arm.name, "ab".repeat(32), arm.size, listOf("arm64-v8a"))
+        ))
+        val rel = release.copy(assets = release.assets + arm)
+        for ((abis, expected) in listOf(listOf("arm64-v8a", "armeabi-v7a") to arm, listOf("x86_64", "x86") to apk)) {
+            val updater = GitHubReleaseUpdater(context, OkHttpClient.Builder().addInterceptor { chain ->
+                val body = if (chain.request().url.encodedPath.endsWith("/latest")) Json.encodeToString(rel) else Json.encodeToString(meta)
+                response(chain, 200, body)
+            }.build(), deviceAbis = abis)
+            assertEquals(expected, updater.check().getOrThrow()!!.apk)
+        }
+    }
+
     @Test fun checksumFailureRemovesPartialFileAndReportsRealBytesOnMain() = runBlocking {
         val before = cacheFiles()
         val progress = mutableListOf<Pair<Long, Long?>>()

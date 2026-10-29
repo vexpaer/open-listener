@@ -204,7 +204,7 @@ class MicrophoneRecognitionService : Service() {
         val pause = state == State.RECORDING
         val controlIntent = PendingIntent.getService(this, 1, Intent(this, javaClass).setAction(if (pause) ACTION_PAUSE else ACTION_RESUME), flags)
         val stop = PendingIntent.getService(this, 2, Intent(this, javaClass).setAction(ACTION_STOP), flags)
-        return NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(R.drawable.ic_launcher_foreground)
+        return NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Open Listener").setContentText(status).setContentIntent(open).setOngoing(true)
             .setOnlyAlertOnce(true).setCategory(NotificationCompat.CATEGORY_SERVICE)
             .addAction(0, if (pause) "Pause" else "Resume", controlIntent).addAction(0, "Stop", stop).build()

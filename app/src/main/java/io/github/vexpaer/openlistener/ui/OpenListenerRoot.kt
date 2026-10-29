@@ -17,9 +17,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -35,8 +37,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -68,7 +68,6 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
         val backStack by nav.currentBackStackEntryAsState()
         val route = backStack?.destination?.route.orEmpty()
         val selected = when { route.startsWith("library") || route.startsWith("detail") -> 1; route == "settings" -> 2; else -> 0 }
-        val state by viewModel.serviceState.collectAsState()
         val notice by viewModel.notice.collectAsState()
         val snackbar = remember { SnackbarHostState() }
         var entered by rememberSaveable { mutableStateOf(false) }
@@ -91,18 +90,21 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
                 modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) { padding ->
                 Column(Modifier.fillMaxSize().padding(padding).widthIn(max = 840.dp).align(Alignment.TopCenter)
                     .padding(horizontal = 20.dp).alpha(entrance)) {
-                    BrandHeader(state)
                     val routes = listOf("listen", "library", "settings")
                     TabRow(selectedTabIndex = selected, containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .55f),
                         contentColor = MaterialTheme.colorScheme.onSurface, divider = {},
                         indicator = { positions ->
                             Box(Modifier.tabIndicatorOffset(positions[selected]).padding(4.dp).fillMaxHeight()
-                                .clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = .12f)))
-                        }, modifier = Modifier.padding(top = 16.dp, bottom = 18.dp).clip(RoundedCornerShape(22.dp))) {
+                                .clip(RoundedCornerShape(percent = 50)).background(MaterialTheme.colorScheme.primary.copy(alpha = .12f)))
+                        }, modifier = Modifier.padding(top = 8.dp, bottom = 18.dp).clip(RoundedCornerShape(percent = 50))) {
                         listOf(tr("录音", "Listen"), tr("记录", "Library"), tr("设置", "Settings")).forEachIndexed { index, label ->
-                            Tab(selected = selected == index, onClick = { navigateTop(routes[index]) },
-                                modifier = Modifier.heightIn(min = 52.dp).testTag("tab-${routes[index]}"),
-                                text = { Text(label, fontWeight = if (selected == index) FontWeight.SemiBold else FontWeight.Normal) })
+                            // The moving pill is the only selection/press background.
+                            Box(Modifier.heightIn(min = 52.dp).testTag("tab-${routes[index]}")
+                                .selectable(selected = selected == index, role = Role.Tab,
+                                    interactionSource = remember { MutableInteractionSource() }, indication = null,
+                                    onClick = { navigateTop(routes[index]) }), contentAlignment = Alignment.Center) {
+                                Text(label, fontWeight = if (selected == index) FontWeight.SemiBold else FontWeight.Normal)
+                            }
                         }
                     }
                     NavHost(navController = nav, startDestination = "listen", modifier = Modifier.weight(1f),
@@ -120,28 +122,6 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun BrandHeader(state: State) {
-    Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("open listener", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-        val live = state == State.RECORDING
-        val motion = LocalMotionAllowed.current
-        val pulse = remember { Animatable(1f) }
-        LaunchedEffect(live, motion) {
-            if (live && motion) while (true) {
-                pulse.animateTo(.45f, tween(1_200)); pulse.animateTo(1f, tween(1_200))
-            } else pulse.snapTo(1f)
-        }
-        val label = stateLabel(state)
-        Row(Modifier.semantics { contentDescription = label }, horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(8.dp).alpha(if (live) pulse.value else 1f).background(
-                if (live) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .65f), CircleShape))
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

@@ -97,6 +97,9 @@ class UiFlowTest {
             compose.onNodeWithTag("library-search").performTextInput("示例译文")
             compose.waitUntil(10_000) { compose.onAllNodes(hasText("Instrumentation lecture")).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText("Instrumentation lecture").performClick()
+            compose.waitUntil(10_000) {
+                compose.onAllNodes(hasText("仅测试构建中的示例译文")).fetchSemanticsNodes().isNotEmpty()
+            }
             compose.onNodeWithText("仅测试构建中的示例译文").performScrollTo().assertIsDisplayed()
             screenshot("06-test-build-illustrative-transcript")
             // Real persisted text is the source of truth, not a transient ASR event.

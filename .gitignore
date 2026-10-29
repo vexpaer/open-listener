@@ -16,5 +16,6 @@ keystore.properties
 model-cache/
 /app/libs/sherpa/
 /release/
+/release-input/
 __pycache__/
 .claude/
