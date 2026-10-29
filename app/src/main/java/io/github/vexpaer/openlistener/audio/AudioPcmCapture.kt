@@ -61,7 +61,7 @@ class AudioPcmCapture : PcmCapture {
         }
     }
 
-    override suspend fun stop() = withContext(Dispatchers.IO) {
+    override suspend fun stop(): Unit = withContext(Dispatchers.IO) {
         val recording = recorder
         job?.cancel()
         try {
