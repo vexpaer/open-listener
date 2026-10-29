@@ -2,6 +2,9 @@ package io.github.vexpaer.openlistener
 
 import android.content.Intent
 import android.graphics.Bitmap
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.assertHeightIsEqualTo
@@ -107,7 +110,7 @@ class UiFlowTest {
             compose.onNodeWithTag("tab-library").performClick()
             compose.onNodeWithTag("library-search").performTextInput("示例译文")
             compose.waitUntil(10_000) { compose.onAllNodes(hasText("Instrumentation lecture")).fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithTag("session-preview-$id").assertTextEquals("Illustrative transcript in test build")
+            compose.onNodeWithTag("session-preview-$id", useUnmergedTree = true).assertTextEquals("Illustrative transcript in test build")
             compose.onNodeWithText("Instrumentation lecture").performClick()
             compose.waitUntil(10_000) {
                 compose.onAllNodes(hasText("仅测试构建中的示例译文")).fetchSemanticsNodes().isNotEmpty()
@@ -131,13 +134,27 @@ class UiFlowTest {
             compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("asr-cloud-models"))
             compose.onNodeWithTag("asr-cloud-models").performClick()
             compose.onNodeWithTag("asr-credentials").assertIsDisplayed()
+            compose.onNodeWithTag("asr-api-help").performClick()
+            compose.onNodeWithTag("api-guide-page").assertIsDisplayed()
+            compose.onNodeWithTag("api-guide-link-0").assertHasClickAction()
+            compose.onNodeWithText("https://console.volcengine.com/speech/new/setting/apikeys").assertIsDisplayed()
+            compose.onNodeWithTag("api-guide-back").performClick()
             compose.onNodeWithText("阿里云 · 未支持").assertIsNotEnabled()
             compose.onNodeWithTag("model-page-back").performClick()
             compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("translation-cloud-models"))
             compose.onNodeWithTag("translation-cloud-models").performClick()
             compose.onNodeWithText("阿里云").performClick()
-            compose.waitForIdle()
-            assertEquals("qwen", runBlocking { app.preferences.preferences.first().translationProvider })
+            compose.waitUntil(10_000) { runBlocking { app.preferences.preferences.first().translationProvider == "qwen" } }
+            compose.onNodeWithTag("translation-api-help").performClick()
+            compose.onNodeWithText("https://bailian.console.aliyun.com/cn-beijing/model/settings/api-key").assertIsDisplayed()
+            compose.onNodeWithTag("api-guide-back").performClick()
+            compose.onNodeWithTag("translation-credentials").performClick()
+            compose.onNodeWithText("Model / Endpoint ID").performTextReplacement("test-only-draft-model")
+            compose.onNodeWithTag("credentials-api-help").performClick()
+            compose.onNodeWithTag("api-guide-page").assertIsDisplayed()
+            compose.onNodeWithTag("api-guide-back").performClick()
+            compose.onNodeWithText("Model / Endpoint ID").assertTextContains("test-only-draft-model")
+            compose.onNodeWithText("取消").performClick()
             compose.onNodeWithTag("model-page-back").performClick()
             compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("translation-local-models"))
             compose.onNodeWithTag("translation-local-models").performClick()
