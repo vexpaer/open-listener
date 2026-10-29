@@ -24,7 +24,12 @@ class SessionRepository(private val sessions: SessionDao, private val segments: 
         sessions.get(id)?.let { sessions.update(it.copy(state = state, durationMs = durationMs, endedAt = endedAt)) }
     }
     suspend fun renameSession(id: String, title: String) { require(title.isNotBlank()); sessions.rename(id, title.trim().take(200)) }
-    suspend fun deleteSession(id: String) = sessions.delete(id)
+    suspend fun setAudioPath(id: String, path: String?) = sessions.setAudioPath(id, path)
+    suspend fun deleteSession(id: String) {
+        val audio = sessions.get(id)?.audioPath
+        if (audio != null) check(!java.io.File(audio).exists() || java.io.File(audio).delete()) { "Unable to delete recording" }
+        sessions.delete(id)
+    }
     suspend fun markInterruptedSessions() = sessions.markOrphanedAsInterrupted(System.currentTimeMillis())
     suspend fun getSession(id: String): SessionEntity? = sessions.get(id)
     suspend fun listSegments(id: String): List<SegmentEntity> = segments.listForSession(id)

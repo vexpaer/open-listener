@@ -16,6 +16,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.selection.selectable
@@ -73,7 +76,10 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
         val nav = rememberNavController()
         val backStack by nav.currentBackStackEntryAsState()
         val route = backStack?.destination?.route.orEmpty()
-        val selected = when { route.startsWith("library") || route.startsWith("detail") -> 1; route == "settings" -> 2; else -> 0 }
+        val pager = rememberPagerState { 3 }
+        val scope = rememberCoroutineScope()
+        val selected = if (route.startsWith("detail")) 1 else pager.currentPage
+        var settingsSubpage by remember { mutableStateOf(false) }
         val notice by viewModel.notice.collectAsState()
         val snackbar = remember { SnackbarHostState() }
         var entered by rememberSaveable { mutableStateOf(false) }
@@ -84,11 +90,8 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
             viewModel.checkSelectedEngines()
         }
         val navigateTop: (String) -> Unit = { destination ->
-            nav.navigate(destination) {
-                popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-                launchSingleTop = true
-                restoreState = true
-            }
+            if (route != "home") nav.popBackStack("home", false)
+            scope.launch { pager.animateScrollToPage(listOf("listen", "library", "settings").indexOf(destination)) }
         }
         Box(Modifier.fillMaxSize()) {
             AmbientSky(motion, foreground)
@@ -113,14 +116,21 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
                             }
                         }
                     }
-                    NavHost(navController = nav, startDestination = "listen", modifier = Modifier.weight(1f),
+                    NavHost(navController = nav, startDestination = "home", modifier = Modifier.weight(1f),
                         enterTransition = { fadeIn(tween(if (motion) 220 else 0)) },
                         exitTransition = { fadeOut(tween(if (motion) 160 else 0)) },
                         popEnterTransition = { fadeIn(tween(if (motion) 220 else 0)) },
                         popExitTransition = { fadeOut(tween(if (motion) 160 else 0)) }) {
-                        composable("listen") { ListenPage(viewModel, foreground, onSettings = { navigateTop("settings") }) }
-                        composable("library") { LibraryPage(viewModel) { id -> nav.navigate("detail/$id") } }
-                        composable("settings") { SettingsPage(viewModel) }
+                        composable("home") {
+                            HorizontalPager(state = pager, beyondViewportPageCount = 2,
+                                userScrollEnabled = !(pager.currentPage == 2 && settingsSubpage), modifier = Modifier.fillMaxSize().testTag("main-pager")) { page ->
+                                when (page) {
+                                    0 -> ListenPage(viewModel, foreground && pager.currentPage == 0, onSettings = { navigateTop("settings") })
+                                    1 -> LibraryPage(viewModel) { id -> nav.navigate("detail/$id") }
+                                    2 -> SettingsPage(viewModel) { settingsSubpage = it }
+                                }
+                            }
+                        }
                         composable("detail/{id}") { entry ->
                             val id = entry.arguments?.getString("id").orEmpty()
                             SessionDetailPage(id, viewModel, onBack = { nav.popBackStack() })

@@ -171,6 +171,8 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
         catch (error: Exception) { showError(error) }
     }
 
+    fun setRetainAudio(value: Boolean) = editEnginePreference { app.preferences.setRetainAudio(value) }
+    fun setLocalAsrModel(value: String) = editEnginePreference { app.preferences.setLocalAsrModel(value) }
     fun setTheme(value: String) = editPreference { app.preferences.setTheme(value) }
     fun setLanguage(value: String) = editPreference { app.preferences.setLanguage(value) }
     fun setReducedMotion(value: Boolean) = editPreference { app.preferences.setReducedMotion(value) }
@@ -269,6 +271,14 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
             repository.deleteSession(id)
             if (selectedId.value == id) selectedId.value = null
             notify("记录已删除。", "Record deleted.")
+        } catch (error: Exception) { showError(error) }
+    }
+    fun playRecording(id: String) = viewModelScope.launch(Dispatchers.IO) {
+        try {
+            val path = repository.getSession(id)?.audioPath ?: return@launch
+            val uri = FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", File(path))
+            effectChannel.send(UiEffect.StartActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "audio/wav")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)))
         } catch (error: Exception) { showError(error) }
     }
     fun copyText(value: String) {

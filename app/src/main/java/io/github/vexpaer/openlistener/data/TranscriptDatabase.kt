@@ -16,7 +16,8 @@ data class SessionEntity(
     val asrProvider: String,
     val translatorProvider: String,
     val state: String,
-    val createdAt: Long
+    val createdAt: Long,
+    val audioPath: String? = null
 )
 
 @Entity(tableName = "segments",
@@ -60,6 +61,8 @@ interface SessionDao {
     fun previews(query: String): Flow<List<SessionPreview>>
     @Query("UPDATE sessions SET title = :title WHERE id = :id")
     suspend fun rename(id: String, title: String)
+    @Query("UPDATE sessions SET audioPath = :path WHERE id = :id")
+    suspend fun setAudioPath(id: String, path: String?)
     @Query("DELETE FROM sessions WHERE id = :id") suspend fun delete(id: String)
     @Query("UPDATE sessions SET state = 'INTERRUPTED', endedAt = :now WHERE state IN ('PREPARING','RECORDING','PAUSED','STOPPING')")
     suspend fun markOrphanedAsInterrupted(now: Long)
@@ -91,12 +94,17 @@ abstract class SegmentDao {
     @Query("DELETE FROM segments WHERE sessionId = :sessionId") abstract suspend fun deleteForSession(sessionId: String)
 }
 
-@Database(entities = [SessionEntity::class, SegmentEntity::class, SegmentSearch::class], version = 1, exportSchema = true)
+@Database(entities = [SessionEntity::class, SegmentEntity::class, SegmentSearch::class], version = 2, exportSchema = true)
 abstract class TranscriptDatabase : RoomDatabase() {
     abstract fun sessionDao(): SessionDao
     abstract fun segmentDao(): SegmentDao
     companion object {
         fun create(context: Context): TranscriptDatabase = Room.databaseBuilder(
-            context, TranscriptDatabase::class.java, "open_listener.db").build()
+            context, TranscriptDatabase::class.java, "open_listener.db")
+            .addMigrations(object : androidx.room.migration.Migration(1, 2) {
+                override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE sessions ADD COLUMN audioPath TEXT DEFAULT NULL")
+                }
+            }).build()
     }
 }

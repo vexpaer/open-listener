@@ -86,7 +86,7 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
                 else -> Column(Modifier.fillMaxSize().testTag("listen-empty"), verticalArrangement = Arrangement.Center) {
                     Icon(Icons.Outlined.GraphicEq, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(20.dp))
-                    Text(tr("听见课堂，\n读懂每一句。", "Your lecture,\nin both languages."), style = MaterialTheme.typography.headlineLarge)
+                    Text(tr("听见课堂，\n读懂每一句。", "Listen clearly.\nRead along."), style = MaterialTheme.typography.headlineLarge)
                     Spacer(Modifier.height(24.dp))
                     if (check.busy) Text(tr("正在检查所选引擎…", "Checking selected engines…"), style = MaterialTheme.typography.bodyMedium)
                     else if (!check.ready) {
@@ -214,7 +214,7 @@ internal fun LibraryPage(model: OpenListenerViewModel, onOpen: (String) -> Unit)
             modifier = Modifier.fillMaxWidth().testTag("library-search"), shape = RoundedCornerShape(18.dp))
         if (sessions.isEmpty()) EmptyReading(Icons.Outlined.BookmarkBorder,
             if (query.isBlank()) tr("还没有记录", "No records yet") else tr("没有匹配的记录", "No matching records"),
-            if (query.isBlank()) tr("结束聆听后，已确认的文字会留在这里。", "Confirmed words will be here after you finish listening.")
+            if (query.isBlank()) ""
             else tr("试试其他标题或正文关键词。", "Try another title or phrase."), modifier = Modifier.weight(1f).testTag("library-empty"))
         else LazyColumn(state = list, modifier = Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
             items(sessions, key = { it.session.id }) { entry ->
@@ -222,7 +222,7 @@ internal fun LibraryPage(model: OpenListenerViewModel, onOpen: (String) -> Unit)
                 Surface(onClick = { onOpen(session.id) }, color = MaterialTheme.colorScheme.surface.copy(alpha = .75f), contentColor = MaterialTheme.colorScheme.onSurface, shape = RoundedCornerShape(18.dp),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                        Text(session.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text((if (session.audioPath != null) "🎧 " else "") + session.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         Text(entry.preview.ifBlank { tr("暂无转录内容", "No transcript yet") }.lineSequence().joinToString(" "),
                             style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("session-preview-${session.id}"))
@@ -263,6 +263,7 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
                 DisplayModes(mode, { mode = it })
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (current.audioPath != null && !current.state.isBlank() && current.state !in listOf("PREPARING", "RECORDING", "PAUSED", "STOPPING")) TextButton(onClick = { model.playRecording(id) }, modifier = Modifier.testTag("play-recording")) { Text(tr("🎧 播放录音", "🎧 Play recording")) }
                     TextButton(onClick = { model.copySession(id) }) { Icon(Icons.Outlined.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(tr("复制全文", "Copy all")) }
                     DocumentFormat.entries.forEach { format ->
                         TextButton(onClick = { model.requestExport(id, format) }) { Text("${tr("导出", "Save")} ${format.extension.uppercase()}") }

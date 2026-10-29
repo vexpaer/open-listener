@@ -19,6 +19,8 @@ data class AppPreferences(
     val subtitleFontScale: Float = 1f,
     val sourceLanguage: String = "en",
     val targetLanguage: String = "zh-CN",
+    val retainAudio: Boolean = false,
+    val localAsrModel: String = io.github.vexpaer.openlistener.models.ModelCatalog.DEFAULT_ID,
     val asrProvider: String = "local",
     val translationProvider: String = "mlkit"
 )
@@ -31,6 +33,8 @@ class PreferencesStore(private val context: Context) {
         val subtitleFontScale = floatPreferencesKey("subtitle_font_scale")
         val sourceLanguage = stringPreferencesKey("source_language")
         val targetLanguage = stringPreferencesKey("target_language")
+        val retainAudio = booleanPreferencesKey("retain_audio")
+        val localAsrModel = stringPreferencesKey("local_asr_model")
         val asrProvider = stringPreferencesKey("asr_provider")
         val translationProvider = stringPreferencesKey("translation_provider")
     }
@@ -43,11 +47,15 @@ class PreferencesStore(private val context: Context) {
             subtitleFontScale = (values[Keys.subtitleFontScale] ?: 1f).coerceIn(.85f, 1.5f),
             sourceLanguage = values[Keys.sourceLanguage] ?: "en",
             targetLanguage = values[Keys.targetLanguage] ?: "zh-CN",
+            retainAudio = values[Keys.retainAudio] ?: false,
+            localAsrModel = values[Keys.localAsrModel] ?: io.github.vexpaer.openlistener.models.ModelCatalog.DEFAULT_ID,
             asrProvider = values[Keys.asrProvider] ?: "local",
             translationProvider = values[Keys.translationProvider] ?: "mlkit"
         )
     }
 
+    suspend fun setRetainAudio(value: Boolean) = context.settingsDataStore.edit { it[Keys.retainAudio] = value }
+    suspend fun setLocalAsrModel(value: String) = context.settingsDataStore.edit { it[Keys.localAsrModel] = value }
     suspend fun setTheme(value: String) = context.settingsDataStore.edit { it[Keys.theme] = value }
     suspend fun setReducedMotion(value: Boolean) = context.settingsDataStore.edit { it[Keys.reducedMotion] = value }
     suspend fun setLanguage(value: String) = context.settingsDataStore.edit { it[Keys.appLanguage] = value }

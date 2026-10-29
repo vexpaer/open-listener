@@ -1,12 +1,13 @@
 # Privacy
 
-Open Listener is text-first. The app does not create, retain, export or replay an audio recording.
+Open Listener is text-first. Audio retention is off by default. Turning on Keep recordings saves new sessions as private WAV files on this device; their Library entries display 🎧 and offer playback. Deleting a record also deletes its audio.
 
 ## Microphone data
 
-After the user taps Start on the visible Listen page and grants `RECORD_AUDIO`, a microphone foreground service reads mono PCM16 frames into a small bounded memory queue. Frames are passed to the selected ASR engine and discarded. Queue overflow stops the session with an error rather than writing audio to disk.
+After the user taps Start on the visible Listen page and grants `RECORD_AUDIO`, a microphone foreground service reads mono PCM16 frames into a small bounded memory queue. Frames are passed to the selected ASR engine. When Keep recordings is enabled, captured frames are also written to a private WAV file. Queue overflow stops the session with an error rather than writing audio to disk.
 
 - **Offline sherpa-onnx:** frames stay on the device.
+- **OpenAI, Qwen-ASR and custom speech APIs:** short audio chunks are uploaded to the selected HTTPS endpoint for transcription.
 - **Doubao realtime ASR:** frames are sent to the configured Volcengine endpoint. The provider's terms, retention and billing policies apply.
 
 The app does not log PCM, transcript bodies, API keys or cloud response bodies.
@@ -29,4 +30,4 @@ The app requests microphone and, where applicable, notification permission. The 
 
 ## Deletion and limitations
 
-Deleting a record removes its local text segments. It cannot recall text or PCM already sent to a cloud provider, nor copies made by a sharing target. This document is product documentation, not a legal privacy notice for any third-party provider.
+Deleting a record removes its local text segments and retained audio. It cannot recall text or PCM already sent to a cloud provider, nor copies made by a sharing target. This document is product documentation, not a legal privacy notice for any third-party provider.

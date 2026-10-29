@@ -80,6 +80,16 @@ private fun apiGuide(provider: String, savedBaseUrl: String): ApiGuide {
             tr("返回填写 X-Api-Key 和对应的 X-Api-Resource-Id。2.0 小时版资源 ID 为 volc.seedasr.sauc.duration，然后保存。", "Enter X-Api-Key and the matching X-Api-Resource-Id. The 2.0 hourly resource ID is volc.seedasr.sauc.duration, then save.")
         ), listOf(getKey to "https://console.volcengine.com/speech/new/setting/apikeys",
             docs to "https://docs.volcengine.com/docs/doubao-voice/console-guidance?lang=zh"))
+        "asr_openai", "asr_custom" -> ApiGuide(tr("语音识别 · OpenAI 兼容", "Speech · OpenAI compatible"), listOf(
+            tr("在服务商控制台创建 API Key 并开通语音转写模型。", "Create an API key and enable a speech transcription model."),
+            tr("填写 HTTPS API 根路径和模型 ID，例如 gpt-transcribe。自定义服务必须兼容 /audio/transcriptions 的 WAV 文件上传。", "Enter the HTTPS API root and model ID, for example gpt-transcribe. Custom services must accept WAV uploads at /audio/transcriptions."),
+            tr("每段音频最多 12 秒。可填写服务商支持的语音模型 ID。", "Audio is sent in chunks up to 12 seconds. Enter a speech model ID supported by your provider.")
+        ), listOf(getKey to "https://platform.openai.com/api-keys", docs to "https://developers.openai.com/api/docs/guides/speech-to-text"))
+        "asr_qwen" -> ApiGuide(tr("阿里云百炼 · 语音识别", "Alibaba Cloud · Speech recognition"), listOf(
+            tr("在百炼创建 API Key，开通 Qwen-ASR。", "Create a Model Studio API key and enable Qwen-ASR."),
+            tr("模型填写 qwen3-asr-flash 或兼容该接口的版本，Base URL 与 Key 地域一致。", "Use qwen3-asr-flash or a compatible version, with a Base URL in the same region as your key."),
+            tr("通过 Qwen-ASR 的 Chat Completions 接口上传短音频。", "Short audio chunks are uploaded through the Qwen-ASR Chat Completions API.")
+        ), listOf(getKey to "https://bailian.console.aliyun.com/cn-beijing/model/settings/api-key", docs to "https://help.aliyun.com/zh/model-studio/qwen-asr-api-reference"))
         "translation_doubao" -> ApiGuide(tr("豆包方舟 · 翻译", "Doubao Ark · Translation"), listOf(
             tr("打开火山方舟控制台，选择项目并创建 API Key。", "Open Volcengine Ark, select your project and create an API key."),
             tr("开通可用的文本模型，复制模型 ID 或推理接入点 ep ID。", "Enable a text model and copy its model ID or inference endpoint ep ID."),

@@ -31,6 +31,7 @@ class MicrophoneRecognitionService : Service() {
     private lateinit var capture: io.github.vexpaer.openlistener.audio.PcmCapture
     private val assembler = SegmentAssembler()
     private lateinit var app: OpenListenerApp
+    private var recording: io.github.vexpaer.openlistener.audio.WavRecording? = null
     private var engine: AsrEngine? = null
     private var translator: TranslationEngine? = null
     private var queue: TranslationQueue? = null
@@ -87,6 +88,12 @@ class MicrophoneRecognitionService : Service() {
         check(translator!!.prepare() == EngineAvailability.Ready) { "Translation engine needs language models or credentials; open Settings" }
         id = app.repository.startSession("Lecture · " + SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(System.currentTimeMillis()),
             prefs.sourceLanguage, prefs.targetLanguage, prefs.asrProvider, prefs.translationProvider)
+        if (prefs.retainAudio) {
+            val directory = java.io.File(filesDir, "recordings").apply { check(isDirectory || mkdirs()) }
+            val file = java.io.File(directory, "${id!!}.wav")
+            recording = io.github.vexpaer.openlistener.audio.WavRecording(file)
+            app.repository.setAudioPath(id!!, file.absolutePath)
+        }
         RecognitionRuntime.begin(id!!)
         queue = TranslationQueue(translator!!, app.repository, prefs.sourceLanguage, prefs.targetLanguage, scope, ::reportFailure)
         events = scope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -109,6 +116,9 @@ class MicrophoneRecognitionService : Service() {
         (engine as? DoubaoRealtimeAsr)?.let { cloud ->
             errors = scope.launch { cloud.errors.collect { error -> if (error != null && !terminating) reportFailure(error) } }
         }
+        (engine as? CloudChunkAsr)?.let { cloud ->
+            errors = scope.launch { cloud.errors.collect { error -> reportFailure(error) } }
+        }
         engine!!.start(id!!)
         startConsumer()
         acquireWakeLock()
@@ -127,7 +137,7 @@ class MicrophoneRecognitionService : Service() {
     private fun startConsumer() {
         val input = capture.audioFrames
         consumer = scope.launch {
-            try { for (frame in input) engine!!.acceptPcm(frame) }
+            try { for (frame in input) { recording?.append(frame); engine!!.acceptPcm(frame) } }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { reportFailure(e) }
         }
@@ -162,7 +172,7 @@ class MicrophoneRecognitionService : Service() {
         var failure = message
         withContext(NonCancellable) {
             suspend fun cleanup(block: suspend () -> Unit) {
-                try { withTimeout(12_000) { block() } }
+                try { withTimeout(45_000) { block() } }
                 catch (error: Exception) {
                     if (terminalState != State.ERROR) terminalState = State.INTERRUPTED
                     if (failure == null) failure = error.message ?: "Session cleanup interrupted; confirmed text is retained"
@@ -174,6 +184,7 @@ class MicrophoneRecognitionService : Service() {
                 capture.audioFrames.close()
                 cleanup { consumer?.join() }
                 consumer?.cancelAndJoin()
+                cleanup { recording?.close(); recording = null }
                 cleanup { engine?.flush() }
                 cleanup { engine?.stop() }
                 // Closing each engine closes its text-event channel. Join the collector to
@@ -218,7 +229,7 @@ class MicrophoneRecognitionService : Service() {
         releaseWakeLock()
         queue?.cancel()
         scope.cancel()
-        CoroutineScope(Dispatchers.IO).launch { runCatching { capture.stop() }; runCatching { engine?.close() }; runCatching { translator?.close() } }
+        CoroutineScope(Dispatchers.IO).launch { runCatching { capture.stop() }; runCatching { recording?.close(); recording = null }; runCatching { engine?.close() }; runCatching { translator?.close() } }
         super.onDestroy()
     }
     override fun onBind(intent: Intent?): IBinder? = null

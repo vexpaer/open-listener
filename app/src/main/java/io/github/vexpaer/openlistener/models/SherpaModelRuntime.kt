@@ -9,18 +9,18 @@ import java.io.File
 
 /** Official Kotlin API from sherpa-onnx v2.0.1; no reflection or alternate API guesses. */
 internal object SherpaModelRuntime {
-    fun create(directory: File): OnlineRecognizer = OnlineRecognizer(
+    fun create(directory: File, manifest: ModelManifest = ModelCatalog.models.first()): OnlineRecognizer = OnlineRecognizer(
         assetManager = null,
         config = OnlineRecognizerConfig(
             featConfig = FeatureConfig(sampleRate = 16_000, featureDim = 80),
             modelConfig = OnlineModelConfig(
                 transducer = OnlineTransducerModelConfig(
-                    encoder = File(directory, "encoder-epoch-99-avg-1.int8.onnx").absolutePath,
-                    decoder = File(directory, "decoder-epoch-99-avg-1.onnx").absolutePath,
-                    joiner = File(directory, "joiner-epoch-99-avg-1.int8.onnx").absolutePath
+                    encoder = File(directory, manifest.files.first { it.path.startsWith("encoder") }.path).absolutePath,
+                    decoder = File(directory, manifest.files.first { it.path.startsWith("decoder") }.path).absolutePath,
+                    joiner = File(directory, manifest.files.first { it.path.startsWith("joiner") }.path).absolutePath
                 ),
                 tokens = File(directory, "tokens.txt").absolutePath,
-                modelType = "zipformer",
+                modelType = "", // Let upstream inspect the ONNX metadata for the correct Zipformer generation.
                 provider = "cpu",
                 numThreads = 2,
                 debug = false
@@ -31,8 +31,8 @@ internal object SherpaModelRuntime {
     )
 
     /** Load and exercise the native graph before the staging directory becomes installed. */
-    fun validate(directory: File) {
-        val recognizer = create(directory)
+    fun validate(directory: File, manifest: ModelManifest = ModelCatalog.models.first()) {
+        val recognizer = create(directory, manifest)
         try {
             val stream = recognizer.createStream()
             try {
