@@ -109,6 +109,10 @@ class TranscriptExporterAndroidTest {
             if (fail) throw IOException("Synthetic SAF failure")
             super.write(buffer, offset, length)
         }
+        override fun write(value: Int) {
+            if (fail) throw IOException("Synthetic SAF failure")
+            super.write(value)
+        }
         override fun close() { closed = true; super.close() }
     }
 }
