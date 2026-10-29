@@ -22,15 +22,27 @@ Updated: 2026-10-29. This is a verification ledger, not a device certification c
 
 ## Current verification state
 
-The public repository is now available at https://github.com/vexpaer/open-listener and the source is on `main`. The first Android CI run is in progress; its build, emulator and test conclusions are not yet recorded here. Android/Gradle builds have not been run locally, as required by the brief.
+The public repository is available at https://github.com/vexpaer/open-listener and the verified source is on `main` at commit `65cf73e20b8d915a70d371bf357a3965e2072029`. GitHub Actions run [40893587325](https://github.com/vexpaer/open-listener/actions/runs/40893587325) completed successfully: the build job, API 34 emulator job and API 35 emulator job all passed. Android/Gradle builds have not been run locally, as required by the brief.
 
 A test-only Application/DI path now exercises the microphone-type foreground service with synthetic in-memory PCM, Room persistence, notification pause/resume/stop actions and a simulated screen-off command. This validates service orchestration only; it is not physical microphone, lock-screen endurance, OEM or recognition-accuracy evidence.
 
-Signing secrets, release tag and APK remain pending until CI passes and the stable certificate is configured.
+Signing secrets and release tag remain pending until the stable certificate is configured. The CI debug APK is verified as an artifact, but it is not a signed release build.
 
 ## Evidence policy
 
-Cloud build URLs, emulator reports, screenshots, signing fingerprint and release assets will be recorded only after they actually complete. Until then they remain pending.
+Cloud build URL, emulator reports and artifact checksums are recorded below after completion. Signing fingerprint and release assets remain pending until a stable certificate is configured.
+
+## CI evidence
+
+- Workflow: [Android CI run 40893587325](https://github.com/vexpaer/open-listener/actions/runs/40893587325)
+- Commit: `65cf73e20b8d915a70d371bf357a3965e2072029`
+- Build job: [123516571087](https://github.com/vexpaer/open-listener/actions/runs/40893587325/job/123516571087) ¡ª lint, JVM tests, debug APK and test APK passed.
+- API 34 job: [123518377134](https://github.com/vexpaer/open-listener/actions/runs/40893587325/job/123518377134) ¡ª 17 tests, 0 failures, 0 errors, 0 skipped.
+- API 35 job: [123518376834](https://github.com/vexpaer/open-listener/actions/runs/40893587325/job/123518376834) ¡ª 17 tests, 0 failures, 0 errors, 0 skipped.
+- Debug artifact: `android-debug-65cf73e20b8d915a70d371bf357a3965e2072029`, 77,542,612 bytes.
+- Debug APK SHA-256: `589832e490ba258d7545e1541b86f1520d89dd775a96630007549bf70b436bdd`.
+- Emulator artifacts: `emulator-api-34-65cf73e20b8d915a70d371bf357a3965e2072029` (2,044,419 bytes) and `emulator-api-35-65cf73e20b8d915a70d371bf357a3965e2072029` (2,005,950 bytes).
+- Screenshot note: both emulator artifacts contain `screenshots/README.txt`; instrumentation reports are authoritative because app-private screenshot files may be cleaned by `connectedAndroidTest`.
 
 ## Physical-device checklist
 
