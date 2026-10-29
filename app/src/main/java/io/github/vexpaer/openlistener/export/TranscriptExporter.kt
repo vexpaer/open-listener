@@ -1,5 +1,6 @@
 package io.github.vexpaer.openlistener.export
 
+import android.annotation.SuppressLint
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
@@ -222,13 +223,14 @@ object TranscriptExporter {
         textLocales = android.os.LocaleList(Locale.SIMPLIFIED_CHINESE, Locale.ENGLISH)
     }
 
+    @SuppressLint("WrongConstant")
     internal fun layout(text: String, paint: TextPaint, width: Int, maxLines: Int = Int.MAX_VALUE, alignment: Layout.Alignment = Layout.Alignment.ALIGN_NORMAL): StaticLayout =
         StaticLayout.Builder.obtain(text, 0, text.length, paint, width)
             .setAlignment(alignment)
             .setTextDirection(TextDirectionHeuristics.FIRSTSTRONG_LTR)
             .setIncludePad(true)
             .setLineSpacing(3f, 1.1f)
-            .setBreakStrategy(android.text.LineBreaker.BREAK_STRATEGY_HIGH_QUALITY)
+            .setBreakStrategy(Layout.BREAK_STRATEGY_HIGH_QUALITY)
             .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
             .setMaxLines(maxLines)
             .apply { if (Build.VERSION.SDK_INT >= 28) setUseLineSpacingFromFallbacks(true) }
