@@ -86,7 +86,7 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
         }
         Box(Modifier.fillMaxSize()) {
             AmbientSky(motion, foreground)
-            Scaffold(containerColor = Color.Transparent, snackbarHost = { SnackbarHost(snackbar) },
+            Scaffold(containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.onBackground, snackbarHost = { SnackbarHost(snackbar) },
                 modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) { padding ->
                 Column(Modifier.fillMaxSize().padding(padding).widthIn(max = 840.dp).align(Alignment.TopCenter)
                     .padding(horizontal = 20.dp).alpha(entrance)) {

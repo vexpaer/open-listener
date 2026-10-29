@@ -39,6 +39,8 @@ data class SegmentEntity(
 @Entity(tableName = "segments_fts")
 data class SegmentSearch(val original: String, val translated: String?)
 
+data class SessionPreview(@Embedded val session: SessionEntity, val preview: String)
+
 @Dao
 interface SessionDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
@@ -50,6 +52,12 @@ interface SessionDao {
     suspend fun get(id: String): SessionEntity?
     @Query("SELECT * FROM sessions WHERE title LIKE '%' || :query || '%' OR id IN (SELECT sessionId FROM segments WHERE original LIKE '%' || :query || '%' OR translated LIKE '%' || :query || '%') ORDER BY startedAt DESC")
     fun search(query: String): Flow<List<SessionEntity>>
+    @Query("""SELECT sessions.*, COALESCE((SELECT original FROM segments
+        WHERE sessionId = sessions.id AND trim(original) != '' ORDER BY sequence ASC LIMIT 1), '') AS preview
+        FROM sessions WHERE :query = '' OR title LIKE '%' || :query || '%'
+        OR id IN (SELECT sessionId FROM segments WHERE original LIKE '%' || :query || '%'
+        OR translated LIKE '%' || :query || '%') ORDER BY startedAt DESC""")
+    fun previews(query: String): Flow<List<SessionPreview>>
     @Query("UPDATE sessions SET title = :title WHERE id = :id")
     suspend fun rename(id: String, title: String)
     @Query("DELETE FROM sessions WHERE id = :id") suspend fun delete(id: String)

@@ -93,7 +93,7 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
     val sessions = repository.observeSessions().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val searchQuery = MutableStateFlow("")
     val searchResults = searchQuery.debounce(250).distinctUntilChanged().flatMapLatest { query ->
-        if (query.isBlank()) repository.observeSessions() else repository.search(query.trim())
+        repository.previews(query)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private val selectedId = MutableStateFlow<String?>(null)
     val selectedSession = combine(sessions, selectedId) { all, id -> all.find { it.id == id } }

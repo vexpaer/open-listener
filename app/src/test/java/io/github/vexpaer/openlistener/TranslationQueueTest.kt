@@ -2,6 +2,7 @@ package io.github.vexpaer.openlistener
 
 import io.github.vexpaer.openlistener.asr.TranscriptEvent
 import io.github.vexpaer.openlistener.data.SegmentEntity
+import io.github.vexpaer.openlistener.data.SessionPreview
 import io.github.vexpaer.openlistener.data.SessionEntity
 import io.github.vexpaer.openlistener.data.SegmentDao
 import io.github.vexpaer.openlistener.data.SessionDao
@@ -43,6 +44,7 @@ class TranslationQueueTest {
         override fun observeAll() = kotlinx.coroutines.flow.emptyFlow<List<SessionEntity>>()
         override suspend fun get(id: String): SessionEntity? = null
         override fun search(query: String) = kotlinx.coroutines.flow.emptyFlow<List<SessionEntity>>()
+        override fun previews(query: String) = kotlinx.coroutines.flow.emptyFlow<List<SessionPreview>>()
         override suspend fun rename(id: String, title: String) = Unit
         override suspend fun delete(id: String) = Unit
         override suspend fun markOrphanedAsInterrupted(now: Long) = Unit

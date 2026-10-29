@@ -2,6 +2,14 @@ package io.github.vexpaer.openlistener
 
 import android.content.Intent
 import android.graphics.Bitmap
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -65,10 +73,13 @@ class UiFlowTest {
 
             compose.onNodeWithTag("tab-settings").performClick()
             compose.onNodeWithTag("settings-page").assertIsDisplayed()
-            screenshot("03-settings-experience")
-            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("download-asr-model"))
+            screenshot("03-settings-overview")
+            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("asr-local-models"))
+            compose.onNodeWithTag("asr-local-models").performClick()
+            compose.onNodeWithTag("settings-model-page").performScrollToNode(hasTestTag("download-asr-model"))
             compose.onNodeWithTag("download-asr-model").assertIsDisplayed().assertIsEnabled()
             screenshot("04-settings-models")
+            compose.onNodeWithTag("model-page-back").performClick()
             compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("check-updates"))
             compose.onNodeWithTag("check-updates").assertIsDisplayed().assertIsEnabled()
             compose.onNodeWithTag("download-update").assertIsDisplayed().assertIsNotEnabled()
@@ -96,6 +107,7 @@ class UiFlowTest {
             compose.onNodeWithTag("tab-library").performClick()
             compose.onNodeWithTag("library-search").performTextInput("示例译文")
             compose.waitUntil(10_000) { compose.onAllNodes(hasText("Instrumentation lecture")).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("session-preview-$id").assertTextEquals("Illustrative transcript in test build")
             compose.onNodeWithText("Instrumentation lecture").performClick()
             compose.waitUntil(10_000) {
                 compose.onAllNodes(hasText("仅测试构建中的示例译文")).fetchSemanticsNodes().isNotEmpty()
@@ -104,6 +116,38 @@ class UiFlowTest {
             screenshot("06-test-build-illustrative-transcript")
             // Real persisted text is the source of truth, not a transient ASR event.
             assertEquals("仅测试构建中的示例译文", runBlocking { app.repository.listSegments(id).single().translated })
+        }
+    }
+
+    @Test fun modelCategories_darkTheme_andMatchingListeningControls() {
+        reset()
+        runBlocking { app.preferences.setTheme("dark") }
+        ActivityScenario.launch<MainActivity>(Intent(app, MainActivity::class.java)).use {
+            compose.onNodeWithTag("tab-settings").performClick()
+            compose.onNodeWithText("目标语言").assertIsDisplayed()
+            val textLayout = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithText("目标语言").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(textLayout) }
+            assertEquals(Color(0xFFF5F6FA), textLayout.single().layoutInput.style.color)
+            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("asr-cloud-models"))
+            compose.onNodeWithTag("asr-cloud-models").performClick()
+            compose.onNodeWithTag("asr-credentials").assertIsDisplayed()
+            compose.onNodeWithText("阿里云 · 未支持").assertIsNotEnabled()
+            compose.onNodeWithTag("model-page-back").performClick()
+            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("translation-cloud-models"))
+            compose.onNodeWithTag("translation-cloud-models").performClick()
+            compose.onNodeWithText("阿里云").performClick()
+            compose.waitForIdle()
+            assertEquals("qwen", runBlocking { app.preferences.preferences.first().translationProvider })
+            compose.onNodeWithTag("model-page-back").performClick()
+            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("translation-local-models"))
+            compose.onNodeWithTag("translation-local-models").performClick()
+            compose.onNodeWithTag("download-language-models").assertIsDisplayed()
+            compose.onNodeWithTag("model-page-back").performClick()
+            compose.onNodeWithTag("tab-listen").performClick()
+            RecognitionRuntime.updateState(MicrophoneRecognitionService.State.PAUSED)
+            compose.onNodeWithTag("listen-primary").assertWidthIsEqualTo(80.dp).assertHeightIsEqualTo(80.dp)
+            compose.onNodeWithTag("stop-listening").assertWidthIsEqualTo(80.dp).assertHeightIsEqualTo(80.dp)
+            screenshot("07-dark-matching-controls")
         }
     }
 
