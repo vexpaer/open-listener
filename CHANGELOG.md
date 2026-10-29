@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 — 2026-10-30
+
+- Remove the top wordmark/status row and move navigation upward.
+- Use capsule navigation and a sliding capsule indicator without pressed shading.
+- Move spoken/translation language choices to the first Target language section.
+- Move theme, app language and subtitle size into Appearance; remove system-choice and reduced-motion controls.
+- Remove the Privacy & storage card and redundant listening labels.
+
 ## 0.1.1 — 2026-10-30
 
 - Replace the launcher and documentation logo with the supplied Open Listener artwork.

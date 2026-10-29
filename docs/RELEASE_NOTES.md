@@ -1,20 +1,12 @@
-## Open Listener 0.1.1
+## Open Listener 0.1.2
 
-### Changes
-
-- New launcher logo using the supplied Open Listener artwork.
-- Two signed APKs: a smaller ARM64 build for phones, and Universal for ARM64 + x86_64.
-- Settings automatically selects the matching update asset and shows its architecture and size before download. Download and system installation still require user action.
-- Per-APK SHA-256/size verification; legacy v0.1.0 clients can still upgrade through the Universal asset.
+- 顶部移除品牌与状态文字，三个导航按钮上移。
+- 导航外框及滑动选中底色改为胶囊形，移除点击时的深色反馈。
+- 设置顶部新增“目标语言”，集中放置语音源语言与翻译目标。
+- 主题、界面语言及字幕字号移至下方“外观”；移除跟随系统选项和减少动态效果开关。
+- 移除“隐私与存储”设置卡片。
+- 录音页移除语言方向、底部隐私文字及开始/暂停/继续文字，保留操作图标。
 
 ### Install
 
-Choose `OpenListener-v0.1.1-arm64-v8a.apk` for an ARM64 phone, or `OpenListener-v0.1.1-universal.apk` for ARM64/x86_64. Compare `SHA256SUMS`, then use the Android system installer. Android 8/API 26+ required. Both packages use the v0.1.0 certificate and versionCode 101, allowing an in-place update without deleting text history. No separate x86 APK is published. 32-bit-only ARM/x86 devices are not supported.
-
-An installed v0.1.0 updater only understands the legacy Universal entry; ABI-specific auto-selection becomes available after installing v0.1.1. Models are downloaded separately in Settings. Provider keys are never bundled.
-
-### Boundaries
-
-Cloud providers require your own credentials; real accounts and physical-device microphone endurance have not been validated here. Model initialization and synthetic PCM tests do not certify recognition accuracy. Aliyun/OpenAI realtime ASR are not delivered; their text translation presets are independent.
-
-The app never stores original microphone audio. Cloud recognition uploads live PCM to the chosen provider; cloud translation uploads confirmed text. ML Kit is proprietary; application source is Apache-2.0.
+Android 8+ · Download `OpenListener-v0.1.2-arm64-v8a.apk` for an ARM64 phone, or `OpenListener-v0.1.2-universal.apk` for ARM64/x86_64. Existing installations can use Settings → Check for updates. The release uses the existing signing key and includes SHA256SUMS and update.json.
