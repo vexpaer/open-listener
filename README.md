@@ -10,7 +10,7 @@ Native Android · live bilingual text · optional audio retention
 
 [中文说明](README.zh-CN.md) · [Build](#build) · [Privacy](PRIVACY.md) · [License](LICENSE)
 
-**[v0.1.0 is available](https://github.com/vexpaer/open-listener/releases/tag/v0.1.0). v0.1.4 simplifies navigation and settings and includes Universal and ARM64 APKs; publication follows hosted verification.**
+**[Download v0.1.5](https://github.com/vexpaer/open-listener/releases/tag/v0.1.5) · ARM64 and Universal APKs**
 
 </div>
 
@@ -20,7 +20,7 @@ Open Listener is a text-first Android companion for lectures, classes and semina
 
 ## What it does
 
-- **Listen:** three top tabs, bilingual live text, partial/final distinction, pause/resume/stop notification actions.
+- **Listen:** swipe between three top tabs, bilingual live text, partial/final distinction, pause/resume/stop notification actions.
 - **Keep:** confirmed segments persist in Room; search, copy, rename, delete, Markdown/PDF export and Android sharing use text only.
 - **Choose the data path:** local sherpa-onnx streaming ASR + on-device ML Kit translation, or BYOK cloud providers with disclosure.
 - **Update safely:** latest stable release metadata, SHA-256, package identity and signing certificate are checked before the Android installer is opened.
@@ -31,7 +31,7 @@ The sample transcript in UI tests is labelled illustrative and is not a product 
 
 - Audio flows through a bounded PCM pipeline. Optional private WAV recordings are marked 🎧 in Library and can be played inside the app.
 - Local ASR and ML Kit translation keep the selected data path on device after their models are installed. ML Kit is a proprietary third-party SDK, not an open-source model.
-- Doubao ASR sends live PCM to Volcengine. Cloud text providers receive confirmed text. Credentials are stored in Android encrypted preferences and never exported.
+- Doubao ASR sends live PCM to Volcengine; Qwen-ASR, OpenAI and custom speech APIs receive short audio chunks. Cloud text providers receive confirmed text. Credentials are stored in Android encrypted preferences and never exported.
 - Android permissions and foreground-service rules remain in force; OEM battery policies can still interrupt long sessions.
 
 Read the full policy in [`PRIVACY.md`](PRIVACY.md) and provider details in [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
@@ -50,7 +50,7 @@ The command is for a machine that already has the Android toolchain; the hosted 
 
 - `app/src/main/.../service` — microphone foreground service and runtime state
 - `app/src/main/.../asr` — engine contracts, sherpa streaming runtime and Doubao protocol
-- `app/src/main/.../data` — Room text-only history and DataStore preferences
+- `app/src/main/.../data` — Room transcript history and optional audio metadata and DataStore preferences
 - `app/src/main/.../translation` — ML Kit and OpenAI-compatible text adapters
 - `app/src/test` — protocol, ordering, export, update-policy and downloader tests
 - `app/src/androidTest` — Compose flow, Room, model/native, ML Kit, export and update checks
@@ -58,7 +58,7 @@ The command is for a machine that already has the Android toolchain; the hosted 
 
 ## Development status
 
-The current version is `0.1.4`. Release downloads include a Universal APK and a smaller ARM64 APK; the in-app updater selects the compatible asset automatically. A provider is shown as ready only after its model or credentials pass the local availability check. Real provider credentials are intentionally not included in CI; protocol tests use anonymized fixtures and mock servers. See [`CHANGELOG.md`](CHANGELOG.md) and [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
+The current version is `0.1.5`. Release downloads include a Universal APK and a smaller ARM64 APK; the in-app updater selects the compatible asset automatically. A provider is shown as ready only after its model or credentials pass the local availability check. Real provider credentials are intentionally not included in CI; protocol tests use anonymized fixtures and mock servers. See [`CHANGELOG.md`](CHANGELOG.md) and [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
 ## License
 

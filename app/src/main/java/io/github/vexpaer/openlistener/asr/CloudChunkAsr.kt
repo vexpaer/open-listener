@@ -134,7 +134,8 @@ class CloudChunkAsr(
             source.request(1_048_577)
             val bytes = source.buffer.readByteArray()
             check(bytes.size <= 1_048_576) { "Speech API response is too large" }
-            val json = Json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject
+            val json = try { Json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject }
+                catch (_: Exception) { throw IOException("Speech API returned an unsupported response format") }
             if (provider == "qwen") json["choices"]!!.jsonArray.first().jsonObject["message"]!!.jsonObject["content"]!!.jsonPrimitive.content.trim()
             else json["text"]!!.jsonPrimitive.content.trim()
         }

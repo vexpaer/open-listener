@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.5 · 2026-10-30
+
+- Swipe navigation for Listen / Library / Settings; clearer English home copy.
+- Dedicated speech and translation settings, with Local / Cloud switches inside each page.
+- Verified English streaming Zipformer model with selectable local model preference.
+- Qwen-ASR, OpenAI transcription and custom compatible cloud speech APIs with editable model IDs.
+- Optional private WAV recording retention (off by default), 🎧 Library markers, in-app playback and audio deletion.
+- Room v1 → v2 migration preserving existing transcripts; updated privacy documentation.
+- Remove Library empty-state subtitle and rename source link to Github.
+
 ## 0.1.4 — 2026-10-30
 
 - Replace the ambient sky with icy blue, soft drifting light and fine grain, with a matching dark palette.

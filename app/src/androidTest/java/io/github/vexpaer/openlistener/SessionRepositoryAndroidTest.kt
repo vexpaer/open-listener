@@ -21,7 +21,7 @@ class SessionRepositoryAndroidTest {
             old.execSQL("CREATE INDEX index_sessions_state ON sessions(state)")
             old.execSQL("CREATE TABLE segments (sessionId TEXT NOT NULL, sequence INTEGER NOT NULL, startOffsetMs INTEGER NOT NULL, endOffsetMs INTEGER, original TEXT NOT NULL, translated TEXT, translationStatus TEXT NOT NULL, revision INTEGER NOT NULL, rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, FOREIGN KEY(sessionId) REFERENCES sessions(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
             old.execSQL("CREATE UNIQUE INDEX index_segments_sessionId_sequence ON segments(sessionId, sequence)")
-            old.execSQL("CREATE VIRTUAL TABLE segments_fts USING FTS4(original TEXT, translated TEXT, content='segments')")
+            old.execSQL("CREATE VIRTUAL TABLE IF NOT EXISTS `segments_fts` USING FTS4(`original` TEXT, `translated` TEXT, content=`segments`)")
             old.execSQL("INSERT INTO sessions VALUES ('legacy', 'Old lecture', 100, 200, 100, 'en', 'zh-CN', 'local', 'mlkit', 'FINISHED', 100)")
             old.execSQL("INSERT INTO segments VALUES ('legacy', 1, 0, 100, 'Keep this text', '保留文字', 'COMPLETED', 0, 1)")
             old.version = 1
