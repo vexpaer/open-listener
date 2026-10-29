@@ -17,3 +17,4 @@ model-cache/
 /app/libs/sherpa/
 /release/
 __pycache__/
+.claude/
