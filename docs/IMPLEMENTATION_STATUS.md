@@ -20,11 +20,13 @@ Updated: 2026-10-29. This is a verification ledger, not a device certification c
 - No performance, transcription accuracy or battery benchmark is claimed.
 - CI model smoke tests use synthetic silence in RAM: they prove model loading/decoder API execution, not recognition accuracy.
 
-## Current external blocker
+## Current verification state
 
-The local source is committed on `feat/bootstrap`. The attempted `gh repo create open-listener --public --source=. --remote=origin --push` was denied by the tool permission boundary (Create Public Surface). No alternative API was used to bypass that decision. Therefore no remote repository, successful CI run, signing secrets, release tag or APK is claimed. Android/Gradle builds were not run locally, as required by the brief. Repository creation/publication permission must be explicitly granted before the cloud build/test/release loop can continue.
+The public repository is now available at https://github.com/vexpaer/open-listener and the source is on `main`. The first Android CI run is in progress; its build, emulator and test conclusions are not yet recorded here. Android/Gradle builds have not been run locally, as required by the brief.
 
-The repository also lacks a completed lock-screen foreground-service integration test and physical-device validation. UI, Room, protocol, model/native, ML Kit, export and update tests are source implementations only until the cloud jobs execute.
+A test-only Application/DI path now exercises the microphone-type foreground service with synthetic in-memory PCM, Room persistence, notification pause/resume/stop actions and a simulated screen-off command. This validates service orchestration only; it is not physical microphone, lock-screen endurance, OEM or recognition-accuracy evidence.
+
+Signing secrets, release tag and APK remain pending until CI passes and the stable certificate is configured.
 
 ## Evidence policy
 
