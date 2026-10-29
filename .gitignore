@@ -12,7 +12,7 @@
 *.jks
 keystore.properties
 .impeccable/config.local.json
-updates/
+/updates/
 model-cache/
 /app/libs/sherpa/
 /release/

@@ -66,7 +66,11 @@ abstract class SegmentDao {
     @Transaction open suspend fun putFinal(segment: SegmentEntity): Boolean {
         val existing = get(segment.sessionId, segment.sequence)
         if (existing == null) { insert(segment); return true }
-        if (segment.revision < existing.revision || segment.original == existing.original) return false
+        if (segment.revision < existing.revision) return false
+        if (segment.original == existing.original) {
+            update(existing.copy(startOffsetMs = segment.startOffsetMs, endOffsetMs = segment.endOffsetMs))
+            return false
+        }
         update(segment.copy(rowId = existing.rowId))
         return true
     }

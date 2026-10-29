@@ -15,13 +15,19 @@ import kotlinx.coroutines.withContext
 import kotlin.math.sqrt
 
 /** One producer and consumer; no audio file or replay queue. Slow consumers cause an explicit failure. */
-class AudioPcmCapture {
-    val audioFrames = Channel<ByteArray>(8)
+interface PcmCapture {
+    val audioFrames: Channel<ByteArray>
+    suspend fun start(scope: CoroutineScope, onLevel: (Float) -> Unit, onError: (Throwable) -> Unit)
+    suspend fun stop()
+}
+
+class AudioPcmCapture : PcmCapture {
+    override val audioFrames = Channel<ByteArray>(8)
     private var recorder: AudioRecord? = null
     private var job: Job? = null
 
     @SuppressLint("MissingPermission")
-    suspend fun start(scope: CoroutineScope, onLevel: (Float) -> Unit, onError: (Throwable) -> Unit) = withContext(Dispatchers.IO) {
+    override suspend fun start(scope: CoroutineScope, onLevel: (Float) -> Unit, onError: (Throwable) -> Unit) = withContext(Dispatchers.IO) {
         check(recorder == null) { "Microphone already active" }
         val minimum = AudioRecord.getMinBufferSize(16_000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         check(minimum > 0) { "16 kHz mono PCM is unsupported on this device" }
@@ -38,6 +44,7 @@ class AudioPcmCapture {
             try {
                 while (isActive) {
                     val count = audio.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
+                    if (!isActive) break
                     check(count > 0) { "Microphone interrupted ($count); return to the app and start again" }
                     var sum = 0.0
                     for (i in 0 until count - 1 step 2) {
@@ -54,12 +61,16 @@ class AudioPcmCapture {
         }
     }
 
-    suspend fun stop() = withContext(Dispatchers.IO) {
-        recorder?.let { if (it.recordingState == AudioRecord.RECORDSTATE_RECORDING) it.stop() }
-        job?.cancelAndJoin()
-        job = null
-        recorder?.release()
-        recorder = null
-        while (audioFrames.tryReceive().isSuccess) Unit
+    override suspend fun stop() = withContext(Dispatchers.IO) {
+        val recording = recorder
+        job?.cancel()
+        try {
+            recording?.let { if (it.recordingState == AudioRecord.RECORDSTATE_RECORDING) it.stop() }
+        } finally {
+            job?.join()
+            job = null
+            recording?.release()
+            recorder = null
+        }
     }
 }

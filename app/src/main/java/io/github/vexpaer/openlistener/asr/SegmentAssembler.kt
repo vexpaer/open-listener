@@ -11,7 +11,11 @@ class SegmentAssembler {
     val state: StateFlow<List<TranscriptEvent>> = _state
 
     fun accept(event: TranscriptEvent): Boolean {
-        if (event.text.isBlank()) return false
+        if (event.text.isBlank()) {
+            if (partial?.segmentId == event.segmentId) partial = null
+            _state.value = confirmed.values.toList()
+            return true
+        }
         val existing = confirmed[event.segmentId]
         if (event.partial) {
             if (existing != null || partial?.let { it.segmentId == event.segmentId && it.revision > event.revision } == true) return false

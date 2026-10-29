@@ -25,6 +25,8 @@ open class OpenListenerApp : Application() {
             java.io.File(cacheDir, "exports").listFiles()?.filter { it.lastModified() < cutoff }?.forEach { it.delete() }
         }
     }
+    open fun newCapture(): io.github.vexpaer.openlistener.audio.PcmCapture = io.github.vexpaer.openlistener.audio.AudioPcmCapture()
+
     open fun newAsr(prefs: AppPreferences): AsrEngine = when (prefs.asrProvider) {
         "local" -> SherpaStreamingAsr(models)
         "doubao" -> DoubaoRealtimeAsr(credentials)

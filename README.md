@@ -8,15 +8,15 @@
 
 Native Android · live bilingual text · no audio files
 
-[![Android CI](https://github.com/vexpaer/open-listener/actions/workflows/android-ci.yml/badge.svg)](https://github.com/vexpaer/open-listener/actions/workflows/android-ci.yml) [![License](https://img.shields.io/github/license/vexpaer/open-listener)](LICENSE)
+[中文说明](README.zh-CN.md) · [Build](#build) · [Privacy](PRIVACY.md) · [License](LICENSE)
 
-[Download APK](https://github.com/vexpaer/open-listener/releases) · [中文说明](README.zh-CN.md) · [Build](#build) · [Privacy](PRIVACY.md)
+**APK: not yet published. Cloud build/release requires permission to create the public repository.**
 
 </div>
 
 Open Listener is a text-first Android companion for lectures, classes and seminars. Tap once while the app is visible, follow original and translated segments, and keep the confirmed text as a searchable record. The app never writes microphone PCM to an audio file.
 
-> **Status:** this repository is an active one-shot release. The app shell, Room text history, foreground microphone service, ML Kit integration, verified model catalog, Doubao WebSocket protocol adapter, cloud text adapters, export/update paths and automated tests are implemented. Hardware microphone continuity and real provider accounts remain explicitly separated in [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
+> **Status: source implementation, not a verified release.** Creating the public GitHub repository was blocked by the execution permission boundary. No Android build or automated Android/JVM test has run yet; no APK or CI success is claimed. The implementation and outstanding checks are tracked in [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
 ## What it does
 
@@ -53,7 +53,7 @@ The command is for a machine that already has the Android toolchain; the hosted 
 - `app/src/main/.../data` — Room text-only history and DataStore preferences
 - `app/src/main/.../translation` — ML Kit and OpenAI-compatible text adapters
 - `app/src/test` — protocol, ordering, export, update-policy and downloader tests
-- `app/src/androidTest` — Compose flow, emulator service/model/export checks
+- `app/src/androidTest` — Compose flow, Room, model/native, ML Kit, export and update checks (not yet executed)
 - `tools/prepare_sherpa.py` — CI-only official archive/source verification
 
 ## Development status

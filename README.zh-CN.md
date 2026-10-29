@@ -4,7 +4,9 @@
 
 原生 Android · 实时双语文字 · 从不保存音频
 
-[下载 APK](https://github.com/vexpaer/open-listener/releases) · [English](README.md) · [构建](#构建) · [隐私](PRIVACY.md)
+[English](README.md) · [构建](#构建) · [隐私](PRIVACY.md)
+
+> **当前为未构建验证的源码实现，不是已发布版本。** 创建公开 GitHub 仓库被执行权限边界拦截，尚未运行 Android/JVM 测试，没有可下载 APK、成功 CI 或 Release。待验证项目见 [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md)。
 
 Open Listener 面向课程、讲座和研讨会。打开应用后在可见页面点击一次，实时阅读原文与译文，并将已经确认的文字保存为可搜索记录。麦克风 PCM 不会写入音频文件。
 

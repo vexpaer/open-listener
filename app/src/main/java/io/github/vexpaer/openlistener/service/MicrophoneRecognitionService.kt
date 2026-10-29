@@ -28,7 +28,7 @@ class MicrophoneRecognitionService : Service() {
     enum class State { IDLE, PREPARING, RECORDING, PAUSED, STOPPING, FINISHED, ERROR, INTERRUPTED }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val control = Mutex()
-    private val capture = AudioPcmCapture()
+    private lateinit var capture: io.github.vexpaer.openlistener.audio.PcmCapture
     private val assembler = SegmentAssembler()
     private lateinit var app: OpenListenerApp
     private var engine: AsrEngine? = null
@@ -40,12 +40,13 @@ class MicrophoneRecognitionService : Service() {
     private var errors: Job? = null
     private var ticker: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
-    private var state = State.IDLE
-    private var terminating = false
+    @Volatile private var state = State.IDLE
+    @Volatile private var terminating = false
 
     override fun onCreate() {
         super.onCreate()
         app = application as OpenListenerApp
+        capture = app.newCapture()
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL_ID, getString(R.string.notification_channel_name), NotificationManager.IMPORTANCE_LOW))
     }
@@ -70,6 +71,7 @@ class MicrophoneRecognitionService : Service() {
                     }
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { finish(State.ERROR, e.message ?: "Listening failed; restart from the visible app") }
+                catch (_: LinkageError) { finish(State.ERROR, "Native runtime is missing or incompatible; reinstall a verified APK") }
             }
         }
         return START_NOT_STICKY
@@ -79,6 +81,7 @@ class MicrophoneRecognitionService : Service() {
         app.recovery.await()
         val prefs = app.preferences.preferences.first()
         engine = app.newAsr(prefs)
+        require(prefs.sourceLanguage in engine!!.capabilities.languages) { "Selected speech engine does not support this source language" }
         translator = app.newTranslator(prefs)
         check(engine!!.prepare() == EngineAvailability.Ready) { "Speech engine needs a model or credentials; open Settings" }
         check(translator!!.prepare() == EngineAvailability.Ready) { "Translation engine needs language models or credentials; open Settings" }
@@ -90,8 +93,10 @@ class MicrophoneRecognitionService : Service() {
             try {
                 engine!!.events.collect { event ->
                     if (assembler.accept(event)) {
-                        if (event.partial) RecognitionRuntime.updatePartial(event)
-                        else {
+                        if (event.partial) RecognitionRuntime.updatePartial(event.takeIf { it.text.isNotBlank() })
+                        else if (event.text.isBlank()) {
+                            if (RecognitionRuntime.partial.value?.segmentId == event.segmentId) RecognitionRuntime.updatePartial(null)
+                        } else {
                             if (RecognitionRuntime.partial.value?.segmentId == event.segmentId) RecognitionRuntime.updatePartial(null)
                             if (app.repository.saveFinalSegment(event.sessionId, event.segmentId, event.startOffsetMs,
                                 event.endOffsetMs, event.text, event.revision)) queue?.offer(event)
@@ -113,7 +118,14 @@ class MicrophoneRecognitionService : Service() {
         acquireWakeLock()
         capture.start(scope, RecognitionRuntime::updateLevel, ::reportFailure)
         setState(State.RECORDING)
-        ticker = scope.launch { while (isActive) { RecognitionRuntime.tick(); delay(1000) } }
+        ticker = scope.launch {
+            var ticks = 0
+            while (isActive) {
+                RecognitionRuntime.tick()
+                if (++ticks % 10 == 0) id?.let { app.repository.finishSession(it, state.name, RecognitionRuntime.elapsedMs.value, null) }
+                delay(1000)
+            }
+        }
         app.repository.finishSession(id!!, "RECORDING", 0, null)
     }
     private suspend fun pause() {
@@ -137,30 +149,41 @@ class MicrophoneRecognitionService : Service() {
         if (terminating) return
         terminating = true
         setState(State.STOPPING)
-        var final = finalState
-        try {
-            capture.stop()
-            consumer?.cancelAndJoin()
-            withTimeout(5_000) { engine?.flush() }
-            // Flow collector persists final events before cancellation; drain its current emission.
-            delay(150)
-        } catch (e: CancellationException) { if (e !is TimeoutCancellationException) throw e; final = State.INTERRUPTED }
-        catch (_: Exception) { final = State.INTERRUPTED }
-        finally {
-            withContext(NonCancellable) {
-                withTimeoutOrNull(2_000) { engine?.stop() }
-                delay(50)
+        ticker?.cancelAndJoin()
+        var completed = finalState == State.FINISHED
+        var failure = message
+        withContext(NonCancellable) {
+            suspend fun cleanup(block: suspend () -> Unit) {
+                try { withTimeout(12_000) { block() } }
+                catch (error: Exception) {
+                    completed = false
+                    if (failure == null) failure = error.message ?: "Session cleanup interrupted; confirmed text is retained"
+                }
+            }
+            try {
+                cleanup { capture.stop() }
+                // Finish the one bounded memory queue; no final PCM is discarded in a normal stop.
+                capture.audioFrames.close()
+                cleanup { consumer?.join() }
+                consumer?.cancelAndJoin()
+                cleanup { engine?.flush() }
+                cleanup { engine?.stop() }
+                // Closing each engine closes its text-event channel. Join the collector to
+                // persist every final event before draining translations, rather than sleeping.
+                cleanup { engine?.close() }
+                cleanup { events?.join() }
                 events?.cancelAndJoin()
                 errors?.cancelAndJoin()
-                queue?.drain(8_000)
-                runCatching { engine?.close() }
-                runCatching { translator?.close() }
-                releaseWakeLock()
-                ticker?.cancel()
+                cleanup { queue?.drain(8_000) }
+                cleanup { translator?.close() }
                 RecognitionRuntime.end()
-                id?.let { app.repository.finishSession(it, final.name, RecognitionRuntime.elapsedMs.value) }
-                setState(final)
-                message?.let { RecognitionRuntime.fail(it) }
+                cleanup {
+                    id?.let { app.repository.finishSession(it, if (completed) "FINISHED" else "INTERRUPTED", RecognitionRuntime.elapsedMs.value) }
+                }
+            } finally {
+                releaseWakeLock()
+                setState(if (completed) State.FINISHED else State.INTERRUPTED)
+                failure?.let { RecognitionRuntime.fail(it) }
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }

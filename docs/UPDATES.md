@@ -10,7 +10,7 @@ Release 必须包含唯一 `update.json` 以及其指名的唯一 APK。`update.
 {
   "tag": "v0.2.0",
   "versionName": "0.2.0",
-  "versionCode": 2,
+  "versionCode": 200,
   "apkName": "OpenListener-v0.2.0.apk",
   "sha256": "<实际签名 APK 的 64 位十六进制 SHA-256，发布时替换>",
   "minSdk": 26,
