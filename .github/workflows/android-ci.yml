@@ -67,9 +67,12 @@ jobs:
           script: |
             ./gradlew --no-daemon connectedDebugAndroidTest
             mkdir -p screenshots
-            adb shell run-as io.github.vexpaer.openlistener ls files/screenshots
-            adb exec-out run-as io.github.vexpaer.openlistener tar -C files/screenshots -cf - . > screenshots.tar
-            tar -xf screenshots.tar -C screenshots
+            if adb shell run-as io.github.vexpaer.openlistener ls files/screenshots >/dev/null 2>&1; then
+              adb exec-out run-as io.github.vexpaer.openlistener tar -C files/screenshots -cf - . > screenshots.tar
+              tar -xf screenshots.tar -C screenshots
+            else
+              printf '%s\n' 'App data was cleaned by connectedAndroidTest; instrumentation reports remain the authoritative evidence.' > screenshots/README.txt
+            fi
       - name: Upload emulator evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
