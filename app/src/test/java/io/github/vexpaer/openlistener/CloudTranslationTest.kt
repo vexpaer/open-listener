@@ -78,6 +78,7 @@ class CloudTranslationTest {
                 val result = engine.translate(7, "hello", "en", "zh")
                 assertEquals("FAILED", result.status)
                 assertTrue(result.errorMessage!!.contains("超时"))
+                assertTrue(server.takeRequest(2, TimeUnit.SECONDS) != null)
             } finally { engine.close() }
 
             server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
@@ -85,7 +86,7 @@ class CloudTranslationTest {
             try {
                 val job = async { cancellable.translate(8, "hello", "en", "zh") }
                 withTimeout(3000) {
-                    while (server.requestCount < 2) kotlinx.coroutines.yield()
+                    server.takeRequest(3, TimeUnit.SECONDS) ?: error("second request was not received")
                 }
                 job.cancelAndJoin()
                 assertTrue(job.isCancelled)
@@ -193,6 +194,7 @@ class CloudTranslationTest {
         val client = OkHttpClient()
         server.start()
         try { block(server, client) } finally {
+            client.dispatcher.cancelAll()
             client.dispatcher.executorService.shutdownNow()
             client.connectionPool.evictAll()
             runCatching { server.shutdown() }
