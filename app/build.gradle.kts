@@ -14,10 +14,15 @@ android {
         applicationId = "io.github.vexpaer.openlistener"
         minSdk = 26
         targetSdk = 36
-        versionCode = 100
-        versionName = "0.1.0"
+        versionCode = 101
+        versionName = "0.1.1"
         testInstrumentationRunner = "io.github.vexpaer.openlistener.ListenerTestRunner"
         vectorDrawables { useSupportLibrary = true }
+        val releaseAbi = providers.gradleProperty("releaseAbi").orElse("universal").get()
+        require(releaseAbi in setOf("universal", "arm64-v8a")) { "Unsupported releaseAbi: $releaseAbi" }
+        ndk {
+            abiFilters += if (releaseAbi == "arm64-v8a") listOf("arm64-v8a") else listOf("arm64-v8a", "x86_64")
+        }
     }
 
     signingConfigs {

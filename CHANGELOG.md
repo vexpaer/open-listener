@@ -1,6 +1,13 @@
 # Changelog
 
-## 0.1.0 — Unreleased
+## 0.1.1 — 2026-10-30
+
+- Replace the launcher and documentation logo with the supplied Open Listener artwork.
+- Publish Universal (ARM64 + x86_64) and smaller ARM64 APKs using the same stable signing certificate.
+- Select the compatible update APK automatically, with per-artifact SHA-256/size checks and a Universal fallback for v0.1.0 clients.
+- Display the selected APK architecture and download size in Settings.
+
+## 0.1.0 — 2026-10-29
 
 - Native Android Compose shell with top Listen / Library / Settings tabs.
 - Text-only Room history, search, copy, rename, delete, Markdown/PDF export and sharing paths.

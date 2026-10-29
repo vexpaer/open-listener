@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/images/mark.svg" width="76" alt="Open Listener original mark" />
+<img src="docs/images/mark.png" width="76" alt="Open Listener logo" />
 
 # Open Listener
 
@@ -10,13 +10,13 @@ Native Android · live bilingual text · no audio files
 
 [中文说明](README.zh-CN.md) · [Build](#build) · [Privacy](PRIVACY.md) · [License](LICENSE)
 
-**APK: not yet published. Cloud build and emulator verification are in progress.**
+**[v0.1.0 is available](https://github.com/vexpaer/open-listener/releases/tag/v0.1.0). v0.1.1 adds Universal and ARM64 APKs; publication follows hosted verification.**
 
 </div>
 
 Open Listener is a text-first Android companion for lectures, classes and seminars. Tap once while the app is visible, follow original and translated segments, and keep the confirmed text as a searchable record. The app never writes microphone PCM to an audio file.
 
-> **Status: source implementation, not yet a verified release.** [Hosted CI](https://github.com/vexpaer/open-listener/actions/workflows/android-ci.yml) is running and build issues are being corrected. No successful CI or release APK is claimed until verification completes. The implementation and outstanding checks are tracked in [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
+> **Hosted build and API 34/35 emulator tests passed for v0.1.0.** Physical-device microphone endurance and real cloud accounts remain unverified. The implementation and outstanding checks are tracked in [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
 ## What it does
 
@@ -53,12 +53,12 @@ The command is for a machine that already has the Android toolchain; the hosted 
 - `app/src/main/.../data` — Room text-only history and DataStore preferences
 - `app/src/main/.../translation` — ML Kit and OpenAI-compatible text adapters
 - `app/src/test` — protocol, ordering, export, update-policy and downloader tests
-- `app/src/androidTest` — Compose flow, Room, model/native, ML Kit, export and update checks (not yet executed)
+- `app/src/androidTest` — Compose flow, Room, model/native, ML Kit, export and update checks
 - `tools/prepare_sherpa.py` — CI-only official archive/source verification
 
 ## Development status
 
-The current version is `0.1.0`. A provider is shown as ready only after its model or credentials pass the local availability check. Real provider credentials are intentionally not included in CI; protocol tests use anonymized fixtures and mock servers. See [`CHANGELOG.md`](CHANGELOG.md) and [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
+The current version is `0.1.1`. Release downloads include a Universal APK and a smaller ARM64 APK; the in-app updater selects the compatible asset automatically. A provider is shown as ready only after its model or credentials pass the local availability check. Real provider credentials are intentionally not included in CI; protocol tests use anonymized fixtures and mock servers. See [`CHANGELOG.md`](CHANGELOG.md) and [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
 ## License
 

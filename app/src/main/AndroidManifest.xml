@@ -10,7 +10,8 @@
     <application
         android:name=".OpenListenerApp"
         android:allowBackup="false"
-        android:icon="@drawable/ic_launcher_foreground"
+        android:icon="@drawable/ic_launcher"
+        android:roundIcon="@drawable/ic_launcher"
         android:label="Open Listener"
         android:supportsRtl="true"
         android:theme="@style/Theme.OpenListener">

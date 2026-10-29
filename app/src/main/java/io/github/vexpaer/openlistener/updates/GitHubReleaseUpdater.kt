@@ -50,6 +50,15 @@ data class GitHubRelease(
 )
 
 @Serializable
+data class UpdateArtifactMetadata(
+    val abi: String,
+    val apkName: String,
+    val sha256: String,
+    val size: Long,
+    val supportedAbis: List<String> = emptyList()
+)
+
+@Serializable
 data class UpdateMetadata(
     val tag: String,
     val versionName: String,
@@ -57,7 +66,8 @@ data class UpdateMetadata(
     val apkName: String,
     val sha256: String,
     val minSdk: Int,
-    val applicationId: String
+    val applicationId: String,
+    val artifacts: List<UpdateArtifactMetadata> = emptyList()
 )
 
 data class UpdateInfo(
@@ -68,7 +78,9 @@ data class UpdateInfo(
     val sha256: String,
     val minSdk: Int,
     val applicationId: String,
-    val notes: String?
+    val notes: String?,
+    val abi: String = "universal",
+    val supportedAbis: Set<String> = emptySet()
 )
 
 class UpdateException(val reason: Reason, message: String, cause: Throwable? = null) : IOException(message, cause) {
@@ -78,7 +90,8 @@ class UpdateException(val reason: Reason, message: String, cause: Throwable? = n
 /** Public releases only; no token is needed or sent. Keep this instance until installation. */
 class GitHubReleaseUpdater(
     context: Context,
-    client: OkHttpClient = OkHttpClient()
+    client: OkHttpClient = OkHttpClient(),
+    private val deviceAbis: List<String> = Build.SUPPORTED_ABIS.toList()
 ) {
     private val context = context.applicationContext
     private val client = client.newBuilder().followRedirects(false).followSslRedirects(false).build()
@@ -102,7 +115,7 @@ class GitHubReleaseUpdater(
                 json.decodeFromString<UpdateMetadata>(readText(response, 64 * 1024))
             }
             val installed = installedIdentity()
-            UpdatePolicy.select(release, metadata, owner, repository, installed, Build.VERSION.SDK_INT)
+            UpdatePolicy.select(release, metadata, owner, repository, installed, Build.VERSION.SDK_INT, deviceAbis)
         })
     } catch (cancelled: CancellationException) {
         throw cancelled
@@ -113,7 +126,7 @@ class GitHubReleaseUpdater(
 
     /** Throws on failure/cancellation, removes partial files; progress always runs on Main. */
     suspend fun download(update: UpdateInfo, onProgress: (Long, Long?) -> Unit): File = withContext(Dispatchers.IO) {
-        UpdatePolicy.validateUpdate(update, owner, repository, installedIdentity(), Build.VERSION.SDK_INT)
+        UpdatePolicy.validateUpdate(update, owner, repository, installedIdentity(), Build.VERSION.SDK_INT, deviceAbis)
         val directory = cacheDirectory()
         val temporary = File.createTempFile("download-", ".part", directory)
         val target = File(directory, "${temporary.nameWithoutExtension}.apk")
@@ -177,7 +190,7 @@ class GitHubReleaseUpdater(
         if (canonical.parentFile != cacheDirectory().canonicalFile || !canonical.isFile || canonical.length() != update.apk.size) {
             throw UpdateException(UpdateException.Reason.PACKAGE, "Verified APK is missing or outside private update cache")
         }
-        UpdatePolicy.validateUpdate(update, owner, repository, installedIdentity(), Build.VERSION.SDK_INT)
+        UpdatePolicy.validateUpdate(update, owner, repository, installedIdentity(), Build.VERSION.SDK_INT, deviceAbis)
         UpdatePolicy.verifyChecksum(checksum(canonical), update.sha256)
         verifyArchive(canonical, update)
         currentCoroutineContext().ensureActive()
@@ -214,6 +227,16 @@ class GitHubReleaseUpdater(
     private fun verifyArchive(file: File, update: UpdateInfo) {
         val archive = packageIdentity(packageInfo(file))
         UpdatePolicy.verifyArchive(archive, installedIdentity(), update, Build.VERSION.SDK_INT)
+        if (update.supportedAbis.isNotEmpty()) {
+            val nativeAbis = java.util.zip.ZipFile(file).use { zip ->
+                zip.entries().asSequence().map { it.name }
+                    .filter { it.startsWith("lib/") && it.endsWith("/libonnxruntime.so") }
+                    .map { it.split('/')[1] }.toSet()
+            }
+            if (nativeAbis != update.supportedAbis || nativeAbis.none { it in deviceAbis }) {
+                throw UpdateException(UpdateException.Reason.PACKAGE, "APK native CPU architectures differ from update metadata")
+            }
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -364,13 +387,20 @@ internal object UpdatePolicy {
     private val apkPattern = Regex("[A-Za-z0-9][A-Za-z0-9._-]*\\.apk")
     private const val MAX_APK_SIZE = 512L * 1024 * 1024
 
-    fun select(release: GitHubRelease, metadata: UpdateMetadata, owner: String, repository: String, installed: PackageIdentity, sdk: Int): UpdateInfo? {
+    fun select(release: GitHubRelease, metadata: UpdateMetadata, owner: String, repository: String, installed: PackageIdentity, sdk: Int, deviceAbis: List<String> = emptyList()): UpdateInfo? {
         metadataRequire(!release.draft && !release.prerelease, "Release is draft or prerelease")
         metadataRequire(metadata.tag == release.tag_name, "update.json tag differs from release tag")
-        val apk = release.assets.singleOrNull { it.name == metadata.apkName }
-            ?: invalidMetadata("Release must contain exactly one APK named by update.json")
-        val update = UpdateInfo(metadata.tag, metadata.versionName, metadata.versionCode, apk, metadata.sha256.lowercase(), metadata.minSdk, metadata.applicationId, release.body)
+        val selected = selectArtifact(metadata, deviceAbis)
+        val apk = release.assets.singleOrNull { it.name == selected.apkName }
+            ?: invalidMetadata("Release must contain exactly one APK named by update metadata")
+        val update = UpdateInfo(metadata.tag, metadata.versionName, metadata.versionCode, apk, selected.sha256.lowercase(), metadata.minSdk, metadata.applicationId, release.body, selected.abi, selected.supportedAbis.toSet())
         validateMetadata(update, owner, repository, installed.applicationId, sdk)
+        metadata.artifacts.forEach { artifact ->
+            val asset = release.assets.singleOrNull { it.name == artifact.apkName }
+                ?: invalidMetadata("Missing or duplicate ABI asset")
+            metadataRequire(artifact.size == asset.size, "ABI asset size differs from update metadata")
+            validateMetadata(update.copy(apk = asset, sha256 = artifact.sha256), owner, repository, installed.applicationId, sdk)
+        }
         val latest = SemanticVersion.parse(update.versionName)
         val current = SemanticVersion.parse(installed.versionName)
         // No patch-as-code derivation and no semantic downgrade disguised as a larger code.
@@ -382,8 +412,31 @@ internal object UpdatePolicy {
         return update
     }
 
-    fun validateUpdate(update: UpdateInfo, owner: String, repository: String, installed: PackageIdentity, sdk: Int) {
+    private fun selectArtifact(metadata: UpdateMetadata, deviceAbis: List<String>): UpdateArtifactMetadata {
+        if (metadata.artifacts.isEmpty()) return UpdateArtifactMetadata("universal", metadata.apkName, metadata.sha256, 0)
+        val artifacts = metadata.artifacts
+        val knownAbis = setOf("arm64-v8a", "x86_64", "armeabi-v7a", "x86")
+        metadataRequire(artifacts.size <= 5 && artifacts.map { it.abi }.distinct().size == artifacts.size, "Duplicate or excessive ABI entries")
+        metadataRequire(artifacts.map { it.apkName }.distinct().size == artifacts.size, "Duplicate ABI asset names")
+        artifacts.forEach { artifact ->
+            metadataRequire(artifact.abi == "universal" || artifact.abi in knownAbis, "Unknown ABI")
+            metadataRequire(artifact.supportedAbis.isNotEmpty() && artifact.supportedAbis.distinct().size == artifact.supportedAbis.size && artifact.supportedAbis.all { it in knownAbis }, "Invalid supported ABI list")
+            metadataRequire(artifact.abi == "universal" || artifact.supportedAbis == listOf(artifact.abi), "Split APK ABI differs from supported ABIs")
+        }
+        val universal = artifacts.singleOrNull { it.abi == "universal" } ?: invalidMetadata("Missing universal fallback")
+        metadataRequire(universal.apkName == metadata.apkName && universal.sha256.equals(metadata.sha256, ignoreCase = true), "Legacy metadata must point to the universal APK")
+        for (abi in deviceAbis) {
+            artifacts.find { it.abi == abi }?.let { return it }
+            if (abi in universal.supportedAbis) return universal
+        }
+        throw UpdateException(UpdateException.Reason.INCOMPATIBLE, "No APK supports this device's CPU architecture")
+    }
+
+    fun validateUpdate(update: UpdateInfo, owner: String, repository: String, installed: PackageIdentity, sdk: Int, deviceAbis: List<String> = emptyList()) {
         validateMetadata(update, owner, repository, installed.applicationId, sdk)
+        if (update.supportedAbis.isNotEmpty() && update.supportedAbis.none { it in deviceAbis }) {
+            throw UpdateException(UpdateException.Reason.INCOMPATIBLE, "APK does not support this device's CPU architecture")
+        }
         metadataRequire(update.versionCode > installed.versionCode && SemanticVersion.parse(update.versionName) > SemanticVersion.parse(installed.versionName), "Update is not newer than the installed app")
     }
 

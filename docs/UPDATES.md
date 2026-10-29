@@ -4,7 +4,11 @@
 
 客户端匿名读取 `https://api.github.com/repos/<BuildConfig.GITHUB_OWNER>/<BuildConfig.GITHUB_REPOSITORY>/releases/latest`，不需要 GitHub Token，只支持公开仓库。仅接受明确标记为 `draft=false`、`prerelease=false` 的 release。API `404` 返回 `NO_RELEASE` 失败（公开仓库不存在和没有稳定版无法由匿名 API 区分），不是“已是最新版”；`403` 限流和 `429` 返回 `RATE_LIMITED`，其余 HTTP、网络、元数据错误分别报告。
 
-Release 必须包含唯一 `update.json` 以及其指名的唯一 APK。`update.json` 所有字段必填，不从 tag 的 patch 推算 versionCode，也不随意选择第一个 APK。
+Release 必须包含唯一 `update.json`，其中每个安装包名称都须精确匹配唯一的 Release asset。不从 tag 的 patch 推算 versionCode，也不随意选择第一个 APK。
+
+从 v0.1.1 起发布 Universal（ARM64 + x86_64）和 ARM64 两个 APK。顶层 `apkName/sha256` 始终指向 Universal，供 v0.1.0 更新器兼容使用。新版读取可选 `artifacts` 数组，每项包含 `abi`、`apkName`、`sha256`、`size`、`supportedAbis`。根据 `Build.SUPPORTED_ABIS` 顺序选择：当前首选 ABI 有专用包则使用专用包，否则使用支持该 ABI 的 Universal；都不兼容时报告 `INCOMPATIBLE`。不支持 32 位 ARM/x86。设置中显示匹配架构和大小，用户点击下载后才传输 APK，系统安装仍需确认。旧客户端升级到 v0.1.1 这一次仍使用 Universal。
+
+每个 artifact 的名称、SHA-256、大小和受支持 ABI 都会校验，下载和安装前再次检查设备 ABI。不存在 `artifacts` 的旧 metadata 保持原单 APK 行为；已有安全检查不变。
 
 ```json
 {

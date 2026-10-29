@@ -350,7 +350,7 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
     fun checkUpdates() {
         if (_updates.value.checking || _updates.value.downloading) return
         viewModelScope.launch {
-            _updates.value = _updates.value.copy(checking = true, error = null)
+            _updates.value = UpdateUiState(checking = true)
             try {
                 updater.check().fold(
                     onSuccess = { update -> _updates.value = UpdateUiState(checked = true, update = update) },

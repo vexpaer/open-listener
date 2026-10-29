@@ -23,8 +23,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
       - name: Prepare SHA-pinned sherpa runtime
         run: python3 -I tools/prepare_sherpa.py --output app/libs/sherpa
+      - name: Test release metadata generation
+        run: python3 -I tools/test_release_metadata.py
       - name: Lint, JVM tests, APK and test APK
         run: ./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug assembleDebugAndroidTest
+      - name: Assemble ARM64 release configuration
+        run: ./gradlew --no-daemon -PreleaseAbi=arm64-v8a assembleRelease
       - name: Upload debug test APKs and reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

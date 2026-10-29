@@ -6,7 +6,7 @@
 
 [English](README.md) · [构建](#构建) · [隐私](PRIVACY.md)
 
-> **当前仍在云端构建验证中，不是已发布版本。** 公开仓库已建立，[GitHub Actions](https://github.com/vexpaer/open-listener/actions/workflows/android-ci.yml) 正在运行并修复构建问题，尚未宣称 CI 通过或提供 Release APK。待验证项目见 [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md)。
+> **[v0.1.0 已发布](https://github.com/vexpaer/open-listener/releases/tag/v0.1.0)。** v0.1.1 新增 Universal 与 ARM64 APK，云端验证完成后发布；应用内更新会根据设备 ABI 自动匹配。真机麦克风耐久性和真实云账户仍未验证。
 
 Open Listener 面向课程、讲座和研讨会。打开应用后在可见页面点击一次，实时阅读原文与译文，并将已经确认的文字保存为可搜索记录。麦克风 PCM 不会写入音频文件。
 

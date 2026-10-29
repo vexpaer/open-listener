@@ -13,8 +13,8 @@ class UpdatePolicyTest {
     private val metadata = UpdateMetadata("v1.10.0", "1.10.0", 124, asset.name, "ab".repeat(32), 26, installed.applicationId)
     private val release = GitHubRelease(metadata.tag, draft = false, prerelease = false, assets = listOf(asset))
 
-    private fun select(meta: UpdateMetadata = metadata, rel: GitHubRelease = release, sdk: Int = 36): UpdateInfo? =
-        UpdatePolicy.select(rel, meta, "vexpaer", "open-listener", installed, sdk)
+    private fun select(meta: UpdateMetadata = metadata, rel: GitHubRelease = release, sdk: Int = 36, abis: List<String> = emptyList()): UpdateInfo? =
+        UpdatePolicy.select(rel, meta, "vexpaer", "open-listener", installed, sdk, abis)
 
     @Test fun comparesSemanticNumbersNotLexicallyOrPatchAsVersionCode() {
         val result = select()!!
@@ -99,6 +99,36 @@ class UpdatePolicyTest {
         ).forEach { invalid -> rejects(UpdateException.Reason.PACKAGE) { UpdatePolicy.verifyArchive(invalid, installed, update, 36) } }
         rejects(UpdateException.Reason.PACKAGE) { UpdatePolicy.verifyArchive(archive, installed.copy(signers = emptySet()), update, 36) }
         rejects(UpdateException.Reason.PACKAGE) { UpdatePolicy.verifyArchive(archive, installed, update, 25) }
+    }
+
+    @Test fun selectsArm64OrUniversalByDeviceAbiAndPreservesLegacyMetadata() {
+        val arm = asset.copy(name = "OpenListener-arm64-v8a.apk", browser_download_url = asset.browser_download_url.replace("OpenListener.apk", "OpenListener-arm64-v8a.apk"), size = 50)
+        val universal = UpdateArtifactMetadata("universal", asset.name, metadata.sha256, asset.size, listOf("arm64-v8a", "x86_64"))
+        val armMetadata = UpdateArtifactMetadata("arm64-v8a", arm.name, "cd".repeat(32), arm.size, listOf("arm64-v8a"))
+        val meta = metadata.copy(artifacts = listOf(universal, armMetadata))
+        val rel = release.copy(assets = listOf(arm, asset))
+        assertEquals(arm.name, select(meta, rel, abis = listOf("arm64-v8a", "armeabi-v7a"))!!.apk.name)
+        assertEquals("arm64-v8a", select(meta, rel, abis = listOf("arm64-v8a"))!!.abi)
+        assertEquals(asset.name, select(meta, rel, abis = listOf("x86_64", "x86"))!!.apk.name)
+        assertEquals(asset.name, select(abis = listOf("arm64-v8a"))!!.apk.name)
+        val olderJson = Json { ignoreUnknownKeys = true }.encodeToString(UpdateMetadata.serializer(), meta)
+        assertEquals(asset.name, Json { ignoreUnknownKeys = true }.decodeFromString<UpdateMetadata>(olderJson).apkName)
+        rejects(UpdateException.Reason.INCOMPATIBLE) { select(meta, rel, abis = listOf("x86")) }
+        rejects(UpdateException.Reason.INCOMPATIBLE) { select(meta, rel, abis = emptyList()) }
+        val selected = select(meta, rel, abis = listOf("arm64-v8a"))!!
+        rejects(UpdateException.Reason.INCOMPATIBLE) { UpdatePolicy.validateUpdate(selected, "vexpaer", "open-listener", installed, 36, listOf("x86_64")) }
+    }
+
+    @Test fun rejectsInvalidAbiMetadataWithoutWeakeningAssetValidation() {
+        val universal = UpdateArtifactMetadata("universal", asset.name, metadata.sha256, asset.size, listOf("arm64-v8a", "x86_64"))
+        fun check(entries: List<UpdateArtifactMetadata>) = select(metadata.copy(artifacts = entries), abis = listOf("arm64-v8a"))
+        rejects { check(listOf(universal, universal)) }
+        rejects { check(listOf(universal.copy(sha256 = "cd".repeat(32)))) }
+        rejects { check(listOf(universal.copy(size = 99))) }
+        rejects { check(listOf(universal.copy(supportedAbis = emptyList()))) }
+        rejects { check(listOf(universal.copy(supportedAbis = listOf("mips")))) }
+        rejects { check(listOf(universal.copy(abi = "mips"))) }
+        rejects { check(listOf(universal.copy(abi = "arm64-v8a", supportedAbis = listOf("arm64-v8a")))) }
     }
 
     private fun rejects(reason: UpdateException.Reason = UpdateException.Reason.INVALID_METADATA, action: () -> Unit) {

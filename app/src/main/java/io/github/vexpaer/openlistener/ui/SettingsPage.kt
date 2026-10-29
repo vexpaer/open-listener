@@ -171,6 +171,9 @@ internal fun SettingsPage(model: OpenListenerViewModel) {
                     updates.checked && updates.update == null -> Text(tr("已是最新版本。", "You're up to date."), style = MaterialTheme.typography.bodyMedium)
                     updates.update != null -> {
                         Text("${tr("可用版本", "Available")}: ${updates.update?.versionName}", style = MaterialTheme.typography.labelLarge)
+                        updates.update?.let { update ->
+                            Hint("${tr("自动匹配安装包", "Matched APK")}: ${update.abi} · ${bytes(update.apk.size)}")
+                        }
                         updates.update?.notes?.takeIf { it.isNotBlank() }?.let { notes -> Text(notes, style = MaterialTheme.typography.bodySmall) }
                     }
                 }
