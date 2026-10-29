@@ -80,13 +80,14 @@ class CloudTranslationTest {
                 assertTrue(result.errorMessage!!.contains("超时"))
                 assertTrue(server.takeRequest(2, TimeUnit.SECONDS) != null)
             } finally { engine.close() }
-
+        }
+        withServer { server, client ->
             server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
             val cancellable = engine(server, client, timeoutMs = 10_000)
             try {
                 val job = async { cancellable.translate(8, "hello", "en", "zh") }
                 withTimeout(3000) {
-                    server.takeRequest(3, TimeUnit.SECONDS) ?: error("second request was not received")
+                    server.takeRequest(3, TimeUnit.SECONDS) ?: error("cancellation request was not received")
                 }
                 job.cancelAndJoin()
                 assertTrue(job.isCancelled)
