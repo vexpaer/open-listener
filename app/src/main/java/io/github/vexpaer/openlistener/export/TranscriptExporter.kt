@@ -228,7 +228,7 @@ object TranscriptExporter {
             .setTextDirection(TextDirectionHeuristics.FIRSTSTRONG_LTR)
             .setIncludePad(true)
             .setLineSpacing(3f, 1.1f)
-            .setBreakStrategy(Layout.BREAK_STRATEGY_HIGH_QUALITY)
+            .setBreakStrategy(android.text.LineBreaker.BREAK_STRATEGY_HIGH_QUALITY)
             .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
             .setMaxLines(maxLines)
             .apply { if (Build.VERSION.SDK_INT >= 28) setUseLineSpacingFromFallbacks(true) }
