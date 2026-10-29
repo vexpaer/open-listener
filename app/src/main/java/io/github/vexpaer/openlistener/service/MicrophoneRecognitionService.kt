@@ -88,7 +88,7 @@ class MicrophoneRecognitionService : Service() {
         id = app.repository.startSession("Lecture · " + SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(System.currentTimeMillis()),
             prefs.sourceLanguage, prefs.targetLanguage, prefs.asrProvider, prefs.translationProvider)
         RecognitionRuntime.begin(id!!)
-        queue = TranslationQueue(translator!!, app.repository, prefs.sourceLanguage, prefs.targetLanguage, scope)
+        queue = TranslationQueue(translator!!, app.repository, prefs.sourceLanguage, prefs.targetLanguage, scope, ::reportFailure)
         events = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
                 engine!!.events.collect { event ->
@@ -150,13 +150,13 @@ class MicrophoneRecognitionService : Service() {
         terminating = true
         setState(State.STOPPING)
         ticker?.cancelAndJoin()
-        var completed = finalState == State.FINISHED
+        var terminalState = finalState
         var failure = message
         withContext(NonCancellable) {
             suspend fun cleanup(block: suspend () -> Unit) {
                 try { withTimeout(12_000) { block() } }
                 catch (error: Exception) {
-                    completed = false
+                    if (terminalState != State.ERROR) terminalState = State.INTERRUPTED
                     if (failure == null) failure = error.message ?: "Session cleanup interrupted; confirmed text is retained"
                 }
             }
@@ -178,11 +178,11 @@ class MicrophoneRecognitionService : Service() {
                 cleanup { translator?.close() }
                 RecognitionRuntime.end()
                 cleanup {
-                    id?.let { app.repository.finishSession(it, if (completed) "FINISHED" else "INTERRUPTED", RecognitionRuntime.elapsedMs.value) }
+                    id?.let { app.repository.finishSession(it, terminalState.name, RecognitionRuntime.elapsedMs.value) }
                 }
             } finally {
                 releaseWakeLock()
-                setState(if (completed) State.FINISHED else State.INTERRUPTED)
+                setState(terminalState)
                 failure?.let { RecognitionRuntime.fail(it) }
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()

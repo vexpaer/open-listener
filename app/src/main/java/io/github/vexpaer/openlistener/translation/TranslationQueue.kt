@@ -7,7 +7,8 @@ import kotlinx.coroutines.channels.Channel
 
 /** Saturation leaves the already-persisted segment PENDING for a user-triggered retry. */
 class TranslationQueue(private val engine: TranslationEngine, private val repository: SessionRepository,
-    private val source: String, private val target: String, scope: CoroutineScope) {
+    private val source: String, private val target: String, scope: CoroutineScope,
+    private val onPersistenceError: (Throwable) -> Unit = {}) {
     private val queue = Channel<TranscriptEvent>(64)
     private val workers = List(2) { scope.launch {
         for (event in queue) {
@@ -23,7 +24,16 @@ class TranslationQueue(private val engine: TranslationEngine, private val reposi
                 if (result.status == "COMPLETED") break
                 if (attempt < 2) delay(500L shl attempt)
             }
-            repository.updateTranslation(event.sessionId, event.segmentId, result.text, result.status, event.revision)
+            for (attempt in 0..2) {
+                try {
+                    repository.updateTranslation(event.sessionId, event.segmentId, result.text, result.status, event.revision)
+                    break
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) {
+                    if (attempt == 2) onPersistenceError(error)
+                    else delay(500L shl attempt)
+                }
+            }
         }
     } }
     fun offer(event: TranscriptEvent) = queue.trySend(event).isSuccess

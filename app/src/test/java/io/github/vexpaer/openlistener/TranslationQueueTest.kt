@@ -34,6 +34,7 @@ class TranslationQueueTest {
         queue.drain(5_000)
         assertEquals(2, calls)
         assertEquals(listOf(4L to "译文"), writes)
+        assertEquals(listOf(2), segmentDao.revisions)
     }
 
     private class FakeSessionDao : SessionDao {
@@ -47,12 +48,13 @@ class TranslationQueueTest {
         override suspend fun markOrphanedAsInterrupted(now: Long) = Unit
     }
     private class FakeSegmentDao(private val writes: MutableList<Pair<Long, String?>>) : SegmentDao() {
+        val revisions = mutableListOf<Int?>()
         override suspend fun insert(segment: SegmentEntity) = Unit
         override suspend fun update(segment: SegmentEntity) = Unit
         override suspend fun get(sessionId: String, sequence: Long): SegmentEntity? = null
         override fun observeForSession(sessionId: String) = kotlinx.coroutines.flow.emptyFlow<List<SegmentEntity>>()
         override suspend fun listForSession(sessionId: String) = emptyList<SegmentEntity>()
-        override suspend fun updateTranslation(sessionId: String, sequence: Long, translated: String?, status: String, revision: Int?) { writes += sequence to translated }
+        override suspend fun updateTranslation(sessionId: String, sequence: Long, translated: String?, status: String, revision: Int?) { writes += sequence to translated; revisions += revision }
         override suspend fun deleteForSession(sessionId: String) = Unit
     }
 }
