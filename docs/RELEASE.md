@@ -14,6 +14,8 @@ Alias: `openlistener`. The private key/password must never appear in Git, artifa
 
 An encrypted P12 backup and its password must be preserved securely outside GitHub if long-term upgrades are required. Losing the certificate means that the same package cannot update installed copies normally. A test/debug APK is explicitly not a stable-signature production release.
 
+A version change in `app/build.gradle.kts` merged into `main` runs the release pipeline; after validation, GitHub creates the matching tag at that exact commit and publishes the assets. Existing version tags can still trigger the same pipeline.
+
 ## Hosted validation
 
 Android CI validates the Wrapper, prepares pinned sherpa native dependencies, runs lint/JVM tests and assembles a debug test APK. Emulator tests run independently on supported API levels. Release runs lint/tests again, builds Universal and ARM64 APKs with the existing stable secrets, verifies every APK signature against the v0.1.0 certificate, checks actual package/version/minSdk/native ABIs, generates both APKs + SHA256SUMS + update.json and only then publishes the tag. `-PreleaseAbi=universal` includes arm64-v8a + x86_64; `-PreleaseAbi=arm64-v8a` includes only arm64-v8a. No 32-bit-only APK is supported.
