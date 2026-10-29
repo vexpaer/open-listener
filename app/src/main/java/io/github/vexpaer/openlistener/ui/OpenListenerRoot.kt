@@ -86,7 +86,7 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
         val entrance by animateFloatAsState(if (entered || !motion) 1f else .4f, tween(if (motion) 550 else 0), label = "first-open")
         LaunchedEffect(Unit) { entered = true }
         LaunchedEffect(notice) { notice?.let { snackbar.showSnackbar(it); viewModel.clearNotice() } }
-        LaunchedEffect(preferences.asrProvider, preferences.translationProvider, preferences.sourceLanguage, preferences.targetLanguage) {
+        LaunchedEffect(preferences.asrProvider, preferences.localAsrModel, preferences.translationProvider, preferences.sourceLanguage, preferences.targetLanguage) {
             viewModel.checkSelectedEngines()
         }
         val navigateTop: (String) -> Unit = { destination ->
@@ -127,7 +127,7 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
                                 when (page) {
                                     0 -> ListenPage(viewModel, foreground && pager.currentPage == 0, onSettings = { navigateTop("settings") })
                                     1 -> LibraryPage(viewModel) { id -> nav.navigate("detail/$id") }
-                                    2 -> SettingsPage(viewModel) { settingsSubpage = it }
+                                    2 -> SettingsPage(viewModel, active = pager.currentPage == 2) { settingsSubpage = it }
                                 }
                             }
                         }

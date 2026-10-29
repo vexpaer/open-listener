@@ -6,7 +6,7 @@
 
 **Listen. Understand. Keep the words.**
 
-Native Android · live bilingual text · no audio files
+Native Android · live bilingual text · optional audio retention
 
 [中文说明](README.zh-CN.md) · [Build](#build) · [Privacy](PRIVACY.md) · [License](LICENSE)
 
@@ -14,7 +14,7 @@ Native Android · live bilingual text · no audio files
 
 </div>
 
-Open Listener is a text-first Android companion for lectures, classes and seminars. Tap once while the app is visible, follow original and translated segments, and keep the confirmed text as a searchable record. The app never writes microphone PCM to an audio file.
+Open Listener is a text-first Android companion for lectures, classes and seminars. Tap once while the app is visible, follow original and translated segments, and keep the confirmed text as a searchable record. Audio retention is off by default; enable Keep recordings to save audio alongside the transcript.
 
 > **Hosted build and API 34/35 emulator tests passed for v0.1.0.** Physical-device microphone endurance and real cloud accounts remain unverified. The implementation and outstanding checks are tracked in [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
@@ -29,7 +29,7 @@ The sample transcript in UI tests is labelled illustrative and is not a product 
 
 ## Privacy in one minute
 
-- Audio is a bounded in-memory PCM pipeline. No audio URI, recording file or replay queue is stored.
+- Audio flows through a bounded PCM pipeline. Optional private WAV recordings are marked 🎧 in Library and can be played inside the app.
 - Local ASR and ML Kit translation keep the selected data path on device after their models are installed. ML Kit is a proprietary third-party SDK, not an open-source model.
 - Doubao ASR sends live PCM to Volcengine. Cloud text providers receive confirmed text. Credentials are stored in Android encrypted preferences and never exported.
 - Android permissions and foreground-service rules remain in force; OEM battery policies can still interrupt long sessions.

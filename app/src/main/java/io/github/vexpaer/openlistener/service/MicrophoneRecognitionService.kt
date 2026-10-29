@@ -184,7 +184,13 @@ class MicrophoneRecognitionService : Service() {
                 capture.audioFrames.close()
                 cleanup { consumer?.join() }
                 consumer?.cancelAndJoin()
-                cleanup { recording?.close(); recording = null }
+                cleanup {
+                    recording?.let { saved ->
+                        saved.close()
+                        if (saved.file.length() <= 44) { saved.file.delete(); id?.let { app.repository.setAudioPath(it, null) } }
+                    }
+                    recording = null
+                }
                 cleanup { engine?.flush() }
                 cleanup { engine?.stop() }
                 // Closing each engine closes its text-event channel. Join the collector to

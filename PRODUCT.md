@@ -30,7 +30,7 @@ The app is used on Android phones during long sessions, including screen-off or 
 
 - Three fixed top-level areas: Listen, Library and Settings; Listen is the first screen.
 - Native Android only, minSdk 26, applicationId `io.github.vexpaer.openlistener`.
-- The microphone is never saved as an audio file or logged. A microphone foreground service owns capture and recognition.
+- Microphone audio is saved privately only when Keep recordings is enabled; it is never logged. A microphone foreground service owns capture and recognition.
 - Confirmed transcript segments are persisted and translated asynchronously by segment id.
 - A real provider or model is shown as available only when it is implemented and configured.
 - The first release records protocol-tested adapters and honest device-validation limits in `docs/IMPLEMENTATION_STATUS.md`.

@@ -273,14 +273,6 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
             notify("记录已删除。", "Record deleted.")
         } catch (error: Exception) { showError(error) }
     }
-    fun playRecording(id: String) = viewModelScope.launch(Dispatchers.IO) {
-        try {
-            val path = repository.getSession(id)?.audioPath ?: return@launch
-            val uri = FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", File(path))
-            effectChannel.send(UiEffect.StartActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "audio/wav")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)))
-        } catch (error: Exception) { showError(error) }
-    }
     fun copyText(value: String) {
         app.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Open Listener", value))
         notify("文字已复制。", "Text copied.")

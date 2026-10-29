@@ -263,7 +263,7 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
                 DisplayModes(mode, { mode = it })
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (current.audioPath != null && !current.state.isBlank() && current.state !in listOf("PREPARING", "RECORDING", "PAUSED", "STOPPING")) TextButton(onClick = { model.playRecording(id) }, modifier = Modifier.testTag("play-recording")) { Text(tr("🎧 播放录音", "🎧 Play recording")) }
+                    if (current.audioPath != null && current.state !in listOf("PREPARING", "RECORDING", "PAUSED", "STOPPING")) RecordingPlayback(current.audioPath)
                     TextButton(onClick = { model.copySession(id) }) { Icon(Icons.Outlined.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(tr("复制全文", "Copy all")) }
                     DocumentFormat.entries.forEach { format ->
                         TextButton(onClick = { model.requestExport(id, format) }) { Text("${tr("导出", "Save")} ${format.extension.uppercase()}") }
@@ -310,3 +310,44 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
 }
 private fun LazyListState.isNearEnd(): Boolean = layoutInfo.totalItemsCount == 0 ||
     (layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) >= layoutInfo.totalItemsCount - 2
+
+@Composable
+private fun RecordingPlayback(path: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    var player by remember(path) { mutableStateOf<android.media.MediaPlayer?>(null) }
+    var playing by remember(path) { mutableStateOf(false) }
+    var loading by remember(path) { mutableStateOf(false) }
+    var failed by remember(path) { mutableStateOf(false) }
+    DisposableEffect(path, lifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                player?.release(); player = null; playing = false; loading = false
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer); player?.release(); player = null }
+    }
+    TextButton(enabled = !loading, modifier = Modifier.testTag("play-recording"), onClick = {
+        failed = false
+        val current = player
+        if (current != null) {
+            if (playing) current.pause() else current.start()
+            playing = !playing
+        } else try {
+            loading = true
+            val audio = android.media.MediaPlayer()
+            player = audio
+            audio.setAudioAttributes(android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_MEDIA).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
+            audio.setDataSource(context, android.net.Uri.fromFile(java.io.File(path)))
+            audio.setOnPreparedListener { loading = false; playing = true; it.start() }
+            audio.setOnCompletionListener { playing = false; it.seekTo(0) }
+            audio.setOnErrorListener { media, _, _ -> media.release(); player = null; playing = false; loading = false; failed = true; true }
+            audio.prepareAsync()
+        } catch (_: Exception) { player?.release(); player = null; loading = false; failed = true }
+    }) {
+        Text(if (loading) tr("🎧 加载中…", "🎧 Loading…") else if (playing) tr("⏸ 暂停录音", "⏸ Pause recording") else tr("🎧 播放录音", "🎧 Play recording"))
+    }
+    if (failed) Text(tr("无法播放此录音", "Unable to play recording"), color = MaterialTheme.colorScheme.error)
+}
