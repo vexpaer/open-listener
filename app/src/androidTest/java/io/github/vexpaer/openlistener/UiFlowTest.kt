@@ -5,7 +5,10 @@ import android.graphics.Bitmap
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.test.swipeDown
 import org.junit.Assert.assertTrue
+import androidx.compose.ui.semantics.SemanticsProperties
+import io.github.vexpaer.openlistener.asr.TranscriptEvent
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.performTextReplacement
@@ -228,6 +231,69 @@ class UiFlowTest {
                 assertEquals(1, textLayout.single().lineCount)
                 screenshot("10-compact-update-$language")
             }
+        }
+    }
+
+    @Test fun liveSubtitles_followGrowingParagraphs_pauseForHistory_andResumeAtBottom() {
+        reset()
+        val id = runBlocking {
+            app.repository.startSession("Follow test", "en", "zh-CN", "local", "mlkit").also {
+                app.repository.saveFinalSegment(it, 1, 0, 1000, "Archived test sentence. ".repeat(40))
+                app.repository.updateTranslation(it, 1, "用于验证自动跟随的测试译文。".repeat(60), "COMPLETED")
+            }
+        }
+        RecognitionRuntime.begin(id); RecognitionRuntime.updateState(MicrophoneRecognitionService.State.RECORDING)
+        try {
+            ActivityScenario.launch<MainActivity>(Intent(app, MainActivity::class.java)).use {
+                fun atTail() = runCatching { compose.onNodeWithTag("live-tail").assertIsDisplayed() }.isSuccess
+                compose.waitUntil(10_000) { atTail() }
+                runBlocking { app.repository.updateTranslation(id, 1, "译文继续增长，仍应跟随到段落最底部。".repeat(100), "COMPLETED") }
+                compose.waitForIdle(); compose.onNodeWithTag("live-tail").assertIsDisplayed()
+                RecognitionRuntime.updatePartial(TranscriptEvent(id, 2, true, "Growing partial sentence. ".repeat(50), 1000, null))
+                compose.waitForIdle(); compose.onNodeWithTag("live-tail").assertIsDisplayed()
+                RecognitionRuntime.updatePartial(TranscriptEvent(id, 2, true, "Growing partial sentence. ".repeat(90), 1000, null, 1))
+                compose.waitForIdle(); compose.onNodeWithTag("live-tail").assertIsDisplayed()
+                compose.onNodeWithTag("live-transcript").performTouchInput { swipeDown() }
+                compose.onNodeWithTag("back-to-latest").assertIsDisplayed()
+                val before = compose.onNodeWithTag("live-transcript").fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+                RecognitionRuntime.updatePartial(TranscriptEvent(id, 2, true, "Growing partial sentence. ".repeat(120), 1000, null, 2))
+                compose.waitForIdle()
+                val after = compose.onNodeWithTag("live-transcript").fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+                assertEquals(before, after, .01f)
+                compose.onNodeWithTag("live-transcript").performScrollToNode(hasTestTag("live-tail"))
+                compose.waitForIdle(); compose.onNodeWithTag("back-to-latest").assertDoesNotExist()
+                RecognitionRuntime.updatePartial(TranscriptEvent(id, 2, true, "Growing partial sentence. ".repeat(140), 1000, null, 3))
+                compose.waitForIdle(); compose.onNodeWithTag("live-tail").assertIsDisplayed()
+                screenshot("11-live-following")
+            }
+        } finally {
+            RecognitionRuntime.end(); RecognitionRuntime.updateState(MicrophoneRecognitionService.State.IDLE)
+            runBlocking { app.repository.finishSession(id, "FINISHED", 1000) }
+        }
+    }
+
+    @Test fun astSettings_useOneKey_andBypassTranslationSetup() {
+        reset()
+        app.credentials.set("doubao_ast", "api_key", "test-only-not-sent")
+        runBlocking { app.preferences.setProviders("doubao_ast", "custom") }
+        try {
+            ActivityScenario.launch<MainActivity>(Intent(app, MainActivity::class.java)).use {
+                compose.onNodeWithTag("tab-settings").performClick()
+                compose.onNodeWithTag("asr-settings").performClick()
+                compose.onNodeWithText("豆包同传").assertIsDisplayed()
+                compose.onNodeWithTag("asr-credentials").performClick()
+                compose.onNodeWithText("Base URL · HTTPS").assertDoesNotExist()
+                compose.onNodeWithText("X-Api-Resource-Id").assertDoesNotExist()
+                compose.onNodeWithText("取消").performClick()
+                compose.onNodeWithTag("model-page-back").performClick()
+                compose.onNodeWithTag("translation-settings").performClick()
+                compose.onNodeWithText("豆包同声传译").assertIsDisplayed()
+                compose.onNodeWithText("本地模型").assertDoesNotExist()
+                screenshot("12-ast-translation")
+            }
+        } finally {
+            app.credentials.remove("doubao_ast", "api_key")
+            runBlocking { app.preferences.setProviders("local", "mlkit") }
         }
     }
 

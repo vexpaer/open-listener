@@ -10,6 +10,24 @@ import org.junit.Test
 
 /** Real in-memory Room, not a production fake database. */
 class SessionRepositoryAndroidTest {
+    @Test fun bilingualUpdatesAreAtomic_andIncompleteTranslationsStayMarked() = runBlocking {
+        val database = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), TranscriptDatabase::class.java).build()
+        try {
+            val repository = SessionRepository(database.sessionDao(), database.segmentDao())
+            val id = repository.startSession("AST", "en", "zh-CN", "doubao_ast", "doubao_ast")
+            val source = io.github.vexpaer.openlistener.asr.TranscriptEvent(id, 1, false, "Hello", 0, 100, 1)
+            repository.saveBilingualFinal(source)
+            repository.saveBilingualFinal(source.copy(revision = 2, translated = "你"))
+            repository.saveBilingualFinal(source.copy(revision = 3, translated = "你好", translationFinal = true))
+            repository.saveBilingualFinal(source.copy(revision = 1, translated = "过期"))
+            val segment = repository.listSegments(id).single()
+            assertEquals("你好", segment.translated); assertEquals("COMPLETED", segment.translationStatus)
+            repository.saveBilingualFinal(source.copy(segmentId = 2, revision = 1, translated = "未完成"))
+            repository.markIncompleteTranslations(id)
+            assertEquals(listOf("COMPLETED", "INCOMPLETE"), repository.listSegments(id).map { it.translationStatus })
+        } finally { database.close() }
+    }
+
     @Test fun upgradeFromVersionOneKeepsExistingTranscript() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val file = context.getDatabasePath("migration-v1-open_listener.db")

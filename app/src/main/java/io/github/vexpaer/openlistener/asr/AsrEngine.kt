@@ -14,7 +14,8 @@ data class AsrCapabilities(
     val displayName: String,
     val streaming: Boolean,
     val languages: Set<String>,
-    val uploadsAudio: Boolean
+    val uploadsAudio: Boolean,
+    val providesTranslation: Boolean = false
 )
 
 data class TranscriptEvent(
@@ -24,7 +25,9 @@ data class TranscriptEvent(
     val text: String,
     val startOffsetMs: Long,
     val endOffsetMs: Long?,
-    val revision: Int = 0
+    val revision: Int = 0,
+    val translated: String? = null,
+    val translationFinal: Boolean = false
 )
 
 interface AsrEngine {

@@ -6,7 +6,7 @@
 
 [English](README.md) · [构建](#构建) · [隐私](PRIVACY.md)
 
-> **[下载 v0.1.6](https://github.com/vexpaer/open-listener/releases/tag/v0.1.6)** · ARM64 / Universal APK；支持应用内更新。
+> **[下载 v0.1.7](https://github.com/vexpaer/open-listener/releases/tag/v0.1.7)** · ARM64 / Universal APK；支持应用内更新。
 
 Open Listener 面向课程、讲座和研讨会。打开应用后在可见页面点击一次，实时阅读原文与译文，并将已经确认的文字保存为可搜索记录。“保留录音”默认关闭，开启后可将新会话录音保存在本机。
 

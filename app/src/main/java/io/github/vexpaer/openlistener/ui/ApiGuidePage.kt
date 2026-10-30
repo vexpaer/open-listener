@@ -101,6 +101,12 @@ private fun apiGuide(provider: String, savedBaseUrl: String): ApiGuide {
     val getKey = tr("获取 API Key", "Get an API key")
     val docs = tr("官方教程", "Official guide")
     return when (provider) {
+        "doubao_ast" -> ApiGuide(tr("豆包同传 2.0 · 字幕模式", "Doubao AST 2.0 · Subtitles"), listOf(
+            tr("在豆包语音控制台开通“同声传译 2.0”服务。", "Enable Simultaneous Translation 2.0 in the Doubao Speech console."),
+            tr("在 API 管理中创建 API Key，并保存到当前配置。资源 ID 已内置，无需填写。", "Create an API key and save it here. The resource ID is configured automatically."),
+            tr("在首页选择语音源语言和翻译目标，开始聆听。原文与译文均由同传模型生成，不会读出译文。", "Choose the spoken and target languages, then start listening. The model supplies both subtitle streams without spoken output.")
+        ), listOf(getKey to "https://console.volcengine.com/speech/new/setting/apikeys",
+            docs to "https://docs.volcengine.com/docs/doubao-voice/simultaneous-interpretation2-0-api-access-documentation?lang=zh"))
         "doubao" -> ApiGuide(tr("豆包 · 语音识别", "Doubao · Speech recognition"), listOf(
             tr("打开豆包语音控制台，在同一项目中开通“流式语音识别 2.0”。", "Open the Doubao Speech console and enable Streaming ASR 2.0 in your project."),
             tr("在“API 管理”中创建并复制 API Key。", "Create and copy a key under API management."),

@@ -7,6 +7,7 @@ import io.github.vexpaer.openlistener.models.ModelStore
 import io.github.vexpaer.openlistener.security.CredentialsStore
 import io.github.vexpaer.openlistener.translation.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 
 open class OpenListenerApp : Application() {
     val database by lazy { TranscriptDatabase.create(this) }
@@ -20,6 +21,7 @@ open class OpenListenerApp : Application() {
             io.github.vexpaer.openlistener.audio.WavAudio.repair(it)
         }
         repository.markInterruptedSessions()
+        repository.observeSessions().first().filter { it.asrProvider == "doubao_ast" && it.state in setOf("INTERRUPTED", "ERROR") }.forEach { repository.markIncompleteTranslations(it.id) }
     } }
 
     override fun onCreate() {
@@ -35,6 +37,7 @@ open class OpenListenerApp : Application() {
     open fun newAsr(prefs: AppPreferences): AsrEngine = when (prefs.asrProvider) {
         "local" -> SherpaStreamingAsr(models, prefs.localAsrModel)
         "doubao" -> DoubaoRealtimeAsr(credentials)
+        "doubao_ast" -> DoubaoSimultaneousAsr(credentials, prefs.sourceLanguage, prefs.targetLanguage)
         "qwen", "openai", "custom" -> CloudChunkAsr(prefs.asrProvider, credentials, prefs.sourceLanguage)
         else -> error("Unsupported speech provider; select a supported engine in Settings")
     }

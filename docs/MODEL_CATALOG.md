@@ -67,3 +67,15 @@ English-only streaming Zipformer, with INT8 encoder/joiner and FP32 decoder. Arc
 - API keys remain in separate encrypted `asr_*` namespaces, independent of translation credentials.
 
 References: [Qwen-ASR API](https://www.alibabacloud.com/help/en/model-studio/qwen-asr-api-reference), [OpenAI speech-to-text](https://developers.openai.com/api/docs/guides/speech-to-text).
+
+## Doubao simultaneous translation 2.0 (S2T)
+
+Select **Doubao AST** under cloud speech settings. One authenticated WebSocket provides both source and translated subtitles; the separate text translator is bypassed. This adapter always sends `mode=s2t`, omits target audio / speaker configuration, and ignores audio events. Enable AST 2.0 in the provider console and save its API key under the separate `doubao_ast` credential namespace.
+
+- Endpoint: `wss://openspeech.bytedance.com/api/v4/ast/v2/translate`
+- Resource: `volc.service_type.10053`
+- Transport: bare protobuf messages (not the SAUC v3 envelope). Core request/response field numbers were checked against the official Java demo linked in the [official AST documentation](https://docs.volcengine.com/docs/doubao-voice/simultaneous-interpretation2-0-api-access-documentation?lang=zh).
+- Source and target languages are explicit; at least one side must be Chinese or English. The app supports its existing seven language choices.
+- Sentence streams are paired using supplied start timestamps, falling back to sentence order. Source finals are retained immediately; translation deltas and finals update that same row. Unfinished translations are marked incomplete on interruption.
+- Pause drains final subtitles and closes the wire session; resume opens a new wire session with continuous app IDs/audio offsets. Unexpected closure, acknowledgement timeouts and provider errors fail explicitly.
+- Validation uses a local WebSocket mock, protobuf wire fixtures, real Room and Android instrumentation. No real provider account is used in CI.

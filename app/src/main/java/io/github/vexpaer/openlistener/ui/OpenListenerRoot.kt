@@ -254,7 +254,7 @@ private fun BoxScope.RecordingBars(model: OpenListenerViewModel, foreground: Boo
             delay(75)
         }
     }
-    val color = MaterialTheme.colorScheme.primary.copy(alpha = .30f)
+    val color = MaterialTheme.colorScheme.primary.copy(alpha = .15f)
     if (active) Canvas(Modifier.matchParentSize().testTag("recording-bars")) {
         val step = size.width / samples.size
         samples.forEachIndexed { index, sample ->
