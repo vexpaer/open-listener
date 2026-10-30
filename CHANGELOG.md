@@ -2,6 +2,7 @@
 
 ## 0.1.9 · 2026-10-30
 
+- Remove emulator jobs and the manual emulator workflow; retain build, Lint, JVM tests and release verification.
 - Apply the selected theme tones to the full ambient gradient and light blooms in both appearances.
 - Double ambient motion speed (80-second cycle).
 - Replace the inline HEX field and pink preset with a rainbow color-wheel entry and brightness control.

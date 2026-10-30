@@ -48,6 +48,8 @@ The project is native Kotlin + Jetpack Compose + Material 3, `minSdk 26`, `targe
 ./gradlew lintDebug testDebugUnitTest assembleDebug
 ```
 
+CI runs compilation, Lint, JVM unit tests and APK assembly; emulator tests are disabled.
+
 The command is for a machine that already has the Android toolchain; the hosted CI workflow is the supported reproducible path for this project. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Repository map

@@ -46,6 +46,8 @@ UI 测试中的示例文字会明确标注为测试构建示例，不代表真�
 ./gradlew lintDebug testDebugUnitTest assembleDebug
 ```
 
+CI 保留编译、Lint、JVM 单元测试和 APK 构建，已移除模拟器测试。
+
 该命令适用于已有 Android 工具链的环境；项目支持的可复现构建路径是 GitHub Actions。贡献方式见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
 
 ## 许可证
