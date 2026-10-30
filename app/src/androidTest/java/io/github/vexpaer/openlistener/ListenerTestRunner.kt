@@ -19,8 +19,12 @@ class ListenerTestRunner : AndroidJUnitRunner() {
 
 class TestListenerApplication : OpenListenerApp() {
     @Volatile var syntheticSession = false
-    override fun newAsr(prefs: AppPreferences): AsrEngine = if (syntheticSession) SyntheticAsr() else super.newAsr(prefs)
-    override fun newTranslator(prefs: AppPreferences): TranslationEngine = if (syntheticSession) SyntheticTranslator() else super.newTranslator(prefs)
+    @Volatile var syntheticBilingual = false
+    override fun newAsr(prefs: AppPreferences): AsrEngine = if (syntheticSession) SyntheticAsr(syntheticBilingual) else super.newAsr(prefs)
+    override fun newTranslator(prefs: AppPreferences): TranslationEngine {
+        check(!syntheticBilingual && (syntheticSession || prefs.asrProvider != "doubao_ast")) { "Integrated speech must not create a second translator" }
+        return if (syntheticSession) SyntheticTranslator() else super.newTranslator(prefs)
+    }
     override fun newCapture(): PcmCapture = if (syntheticSession) SyntheticCapture() else super.newCapture()
 }
 
@@ -39,8 +43,8 @@ private class SyntheticCapture : PcmCapture {
     override suspend fun stop() { job?.cancelAndJoin(); job = null }
 }
 
-private class SyntheticAsr : AsrEngine {
-    override val capabilities = AsrCapabilities("test-only", "Test only", true, setOf("en", "zh-CN"), false)
+private class SyntheticAsr(private val bilingual: Boolean = false) : AsrEngine {
+    override val capabilities = AsrCapabilities("test-only", "Test only", true, setOf("en", "zh-CN"), false, providesTranslation = bilingual)
     override val availability = EngineAvailability.Ready
     private val output = Channel<TranscriptEvent>(32)
     override val events = output.receiveAsFlow()
@@ -50,8 +54,11 @@ private class SyntheticAsr : AsrEngine {
     override suspend fun prepare() = availability
     override suspend fun start(sessionId: String) { session = sessionId }
     override suspend fun acceptPcm(pcm16: ByteArray) {
-        if (++frames % 5 == 0) output.send(TranscriptEvent(session, sequence++, false,
-            "Illustrative foreground-service test text", frames * 100L, frames * 100L + 100))
+        if (++frames % 5 == 0) {
+            val event = TranscriptEvent(session, sequence++, false, "Illustrative foreground-service test text", frames * 100L, frames * 100L + 100)
+            output.send(event)
+            if (bilingual) output.send(event.copy(revision = 1, translated = "仅测试构建中的同传译文", translationFinal = true))
+        }
     }
     override suspend fun pause() = Unit
     override suspend fun resume() = Unit

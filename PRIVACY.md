@@ -8,6 +8,7 @@ After the user taps Start on the visible Listen page and grants `RECORD_AUDIO`, 
 
 - **Offline sherpa-onnx:** frames stay on the device.
 - **OpenAI, Qwen-ASR and custom speech APIs:** short audio chunks are uploaded to the selected HTTPS endpoint for transcription.
+- **Doubao AST 2.0 (S2T):** microphone frames are uploaded to the configured official AST endpoint, which returns source and translated text. No translated speech is requested or played. A separate text translation provider is not called.
 - **Doubao realtime ASR:** frames are sent to the configured Volcengine endpoint. The provider's terms, retention and billing policies apply.
 
 The app does not log PCM, transcript bodies, API keys or cloud response bodies.

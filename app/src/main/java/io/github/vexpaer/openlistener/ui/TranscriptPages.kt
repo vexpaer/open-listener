@@ -15,6 +15,12 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -66,16 +72,42 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
     val list = rememberLazyListState()
     var following by rememberSaveable { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
+    val activeId by model.activeSessionId.collectAsState()
+    var dragging by remember { mutableStateOf(false) }
+    var viewportHeight by remember { mutableIntStateOf(0) }
     val active = state.isSessionActive()
     val visiblePartial = partial?.takeIf { it.partial && it.text.isNotBlank() && segments.none { final -> final.sequence == it.segmentId && final.revision >= it.revision } }
     val count = segments.size + if (visiblePartial != null) 1 else 0
+    LaunchedEffect(activeId) { if (activeId != null) following = true }
     LaunchedEffect(list) {
-        snapshotFlow { list.isScrollInProgress to list.isNearEnd() }.distinctUntilChanged().collect { (scrolling, near) ->
-            if (scrolling) following = near
+        list.interactionSource.interactions.collect { interaction ->
+            when (interaction) {
+                is DragInteraction.Start -> { dragging = true; following = false }
+                is DragInteraction.Stop, is DragInteraction.Cancel -> dragging = false
+            }
         }
     }
-    LaunchedEffect(count, segments.lastOrNull()?.translated, state) {
-        if (following && count > 0 && !list.isScrollInProgress) list.scrollToItem(count - 1)
+    LaunchedEffect(list) {
+        snapshotFlow { Triple(list.canScrollForward, list.isScrollInProgress, dragging) }
+            .distinctUntilChanged().collect { (canForward, scrolling, touching) ->
+                if (!canForward && !scrolling && !touching) following = true
+            }
+    }
+    val userScroll = remember(list) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput && available.y > 0f) following = false
+                return Offset.Zero
+            }
+        }
+    }
+    // Include content revisions and layout changes: one long partial/translation can grow
+    // without adding an item. A tail anchor reaches the bottom of oversized paragraphs.
+    LaunchedEffect(segments, visiblePartial, mode, prefs.subtitleFontScale, following, foreground, viewportHeight) {
+        if (following && foreground && count > 0 && !dragging) {
+            withFrameNanos { }
+            if (!list.isScrollInProgress && following && !dragging) list.scrollToItem(count)
+        }
     }
     Column(Modifier.fillMaxSize().testTag("listen-page")) {
         if (active || segments.isNotEmpty()) {
@@ -85,13 +117,14 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
                 count > 0 -> ReadingSurface(backgroundAlpha = .2f) {
-                    LazyColumn(state = list, modifier = Modifier.fillMaxSize().testTag("live-transcript"),
+                    LazyColumn(state = list, modifier = Modifier.fillMaxSize().nestedScroll(userScroll).onSizeChanged { viewportHeight = it.height }.testTag("live-transcript"),
                         contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
                         items(segments, key = { "final-${it.sequence}" }) { segment ->
                             TranscriptParagraph(segment, mode, prefs.subtitleFontScale, retrying.contains(segment.sequence),
-                                onCopy = { model.copyText(it) }, onRetry = { model.retryTranslation(segment.sessionId, segment.sequence) }, live = true)
+                                onCopy = { model.copyText(it) }, onRetry = { model.retryTranslation(segment.sessionId, segment.sequence) }, live = true, canRetry = prefs.asrProvider != "doubao_ast")
                         }
                         visiblePartial?.let { event -> item(key = "partial-${event.segmentId}") { PartialParagraph(event, mode, prefs.subtitleFontScale) } }
+                        item(key = "live-tail") { Spacer(Modifier.fillMaxWidth().height(1.dp).testTag("live-tail")) }
                     }
                 }
                 active -> EmptyReading(Icons.Outlined.GraphicEq, tr("等待第一段文字", "Waiting for the first words"),
@@ -113,7 +146,7 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
             }
             if (!following && count > 0) FilledTonalButton(onClick = {
                 following = true
-                scope.launch { list.animateScrollToItem(count - 1) }
+                scope.launch { list.animateScrollToItem(count) }
             }, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp).testTag("back-to-latest")) {
                 Icon(Icons.Outlined.ArrowDownward, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(tr("回到最新", "Latest"))
             }
@@ -186,7 +219,7 @@ private fun DisplayModes(mode: TranscriptMode, onSelect: (TranscriptMode) -> Uni
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun TranscriptParagraph(segment: SegmentEntity, mode: TranscriptMode, fontScale: Float, retrying: Boolean, onCopy: (String) -> Unit, onRetry: () -> Unit, live: Boolean = false) {
+private fun TranscriptParagraph(segment: SegmentEntity, mode: TranscriptMode, fontScale: Float, retrying: Boolean, onCopy: (String) -> Unit, onRetry: () -> Unit, live: Boolean = false, canRetry: Boolean = true) {
     Column(Modifier.fillMaxWidth().combinedClickable(onClick = {}, onLongClick = { onCopy(listOfNotNull(segment.original, segment.translated).joinToString("\n")) }),
         verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (mode != TranscriptMode.TRANSLATION) SelectionContainer {
@@ -200,9 +233,9 @@ private fun TranscriptParagraph(segment: SegmentEntity, mode: TranscriptMode, fo
             } else {
                 val failed = segment.translationStatus.contains("FAIL", true) || segment.translationStatus.contains("ERROR", true)
                 Text(if (failed) tr("翻译失败，原文已保存。请检查模型、网络或凭据。", "Translation failed; original text is saved. Check models, network or credentials.")
-                    else tr("译文待完成", "Translation pending"), style = MaterialTheme.typography.bodyMedium,
+                    else if (segment.translationStatus == "INCOMPLETE") tr("同传译文未完成", "Translation incomplete") else tr("译文待完成", "Translation pending"), style = MaterialTheme.typography.bodyMedium,
                     color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.heightIn(min = 28.dp))
-                TextButton(onClick = onRetry, enabled = !retrying) { Text(if (retrying) tr("重译中…", "Translating…") else tr("重新翻译", "Retry translation")) }
+                if (canRetry) TextButton(onClick = onRetry, enabled = !retrying) { Text(if (retrying) tr("重译中…", "Translating…") else tr("重新翻译", "Retry translation")) }
             }
         }
     }
@@ -210,9 +243,14 @@ private fun TranscriptParagraph(segment: SegmentEntity, mode: TranscriptMode, fo
 
 @Composable
 private fun PartialParagraph(event: TranscriptEvent, mode: TranscriptMode, fontScale: Float) {
-    if (mode == TranscriptMode.TRANSLATION) return
-    ArrivalText(event.text, true, MaterialTheme.typography.bodyLarge.copy(fontSize = (17 * fontScale).sp, lineHeight = (27 * fontScale).sp),
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = .72f))
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (mode != TranscriptMode.TRANSLATION && event.text.isNotBlank()) ArrivalText(event.text, true,
+            MaterialTheme.typography.bodyLarge.copy(fontSize = (17 * fontScale).sp, lineHeight = (27 * fontScale).sp),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = .72f))
+        if (mode != TranscriptMode.ORIGINAL && !event.translated.isNullOrBlank()) ArrivalText(event.translated, true,
+            MaterialTheme.typography.bodyLarge.copy(fontSize = (18 * fontScale).sp, lineHeight = (28 * fontScale).sp),
+            color = MaterialTheme.colorScheme.primary)
+    }
 }
 
 @Composable
@@ -297,7 +335,7 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
             if (segments.isEmpty()) item { Text(tr("这场聆听没有已确认的文字。", "This session has no confirmed text."), color = MaterialTheme.colorScheme.onSurfaceVariant) }
             items(segments, key = { it.sequence }) { segment ->
                 TranscriptParagraph(segment, mode, prefs.subtitleFontScale, retrying.contains(segment.sequence), model::copyText,
-                    onRetry = { model.retryTranslation(id, segment.sequence) })
+                    onRetry = { model.retryTranslation(id, segment.sequence) }, canRetry = current.asrProvider != "doubao_ast")
             }
         }
     }
@@ -330,8 +368,6 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
         Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
     }
 }
-private fun LazyListState.isNearEnd(): Boolean = layoutInfo.totalItemsCount == 0 ||
-    (layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) >= layoutInfo.totalItemsCount - 2
 
 @Composable
 private fun RecordingPlayback(path: String) {

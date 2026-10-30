@@ -14,8 +14,8 @@ android {
         applicationId = "io.github.vexpaer.openlistener"
         minSdk = 26
         targetSdk = 36
-        versionCode = 106
-        versionName = "0.1.6"
+        versionCode = 107
+        versionName = "0.1.7"
         testInstrumentationRunner = "io.github.vexpaer.openlistener.ListenerTestRunner"
         vectorDrawables { useSupportLibrary = true }
         val releaseAbi = providers.gradleProperty("releaseAbi").orElse("universal").get()
@@ -91,6 +91,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.kotlinx.serialization.json)
+    implementation("com.google.protobuf:protobuf-javalite:4.33.6")
     implementation(libs.okhttp)
     implementation(libs.mlkit.translate)
     implementation("org.apache.commons:commons-compress:1.28.0")

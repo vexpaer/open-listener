@@ -85,6 +85,16 @@ abstract class SegmentDao {
         update(segment.copy(rowId = existing.rowId))
         return true
     }
+    @Transaction open suspend fun putBilingualFinal(segment: SegmentEntity) {
+        val existing = get(segment.sessionId, segment.sequence)
+        if (existing == null) insert(segment)
+        else if (segment.revision >= existing.revision) update(segment.copy(rowId = existing.rowId))
+    }
+    @Query("SELECT * FROM segments WHERE sessionId = :sessionId AND translationStatus != 'COMPLETED'")
+    abstract suspend fun incompleteForSession(sessionId: String): List<SegmentEntity>
+    @Transaction open suspend fun markIncomplete(sessionId: String) {
+        incompleteForSession(sessionId).forEach { update(it.copy(translationStatus = "INCOMPLETE")) }
+    }
     @Query("SELECT * FROM segments WHERE sessionId = :sessionId ORDER BY sequence ASC")
     abstract fun observeForSession(sessionId: String): Flow<List<SegmentEntity>>
     @Query("SELECT * FROM segments WHERE sessionId = :sessionId ORDER BY sequence ASC")

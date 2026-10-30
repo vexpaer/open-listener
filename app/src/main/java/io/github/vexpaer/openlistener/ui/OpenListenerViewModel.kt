@@ -141,13 +141,13 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
             try {
                 val prefs = preferences.value
                 val asr = app.newAsr(prefs)
-                val translator = app.newTranslator(prefs)
+                val translator = if (asr.capabilities.providesTranslation) null else app.newTranslator(prefs)
                 val availability = try {
                     val speech = asr.availability
-                    if (speech !is EngineAvailability.Ready) speech else translator.prepare()
+                    if (speech !is EngineAvailability.Ready) speech else translator?.prepare() ?: EngineAvailability.Ready
                 } finally {
                     asr.close()
-                    translator.close()
+                    translator?.close()
                 }
                 val detail = availability.detailOrNull()
                 _engineCheck.value = EngineCheck(ready = availability is EngineAvailability.Ready, detail = detail)
@@ -205,13 +205,13 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
             _engineCheck.value = EngineCheck(busy = true)
             try {
                 val speech = app.newAsr(preferences.value)
-                val translation = app.newTranslator(preferences.value)
+                val translation = if (speech.capabilities.providesTranslation) null else app.newTranslator(preferences.value)
                 val result = try {
                     val asr = speech.availability
-                    if (asr !is EngineAvailability.Ready) asr else translation.prepare()
-                } finally { speech.close(); translation.close() }
+                    if (asr !is EngineAvailability.Ready) asr else translation?.prepare() ?: EngineAvailability.Ready
+                } finally { speech.close(); translation?.close() }
                 _engineCheck.value = EngineCheck(ready = result is EngineAvailability.Ready,
-                    detail = result.detailOrNull() ?: text("所选引擎与语言包已就绪。", "Selected engines and language models are ready."))
+                    detail = result.detailOrNull() ?: if (speech.capabilities.providesTranslation) text("豆包同传已配置，可直接生成双语字幕。", "Doubao AST is configured for bilingual subtitles.") else text("所选引擎与语言包已就绪。", "Selected engines and language models are ready."))
             } catch (error: Exception) { _engineCheck.value = EngineCheck(detail = error.message); showError(error) }
         }
     }
@@ -284,6 +284,10 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
             _retrying.value += sequence
             try {
                 val session = repository.getSession(sessionId) ?: return@launch
+                if (session.asrProvider == "doubao_ast") {
+                    notify("同传字幕由音频生成，无法仅用原文重新请求。", "Simultaneous subtitles require audio to regenerate.")
+                    return@launch
+                }
                 val segment = repository.listSegments(sessionId).find { it.sequence == sequence } ?: return@launch
                 val translator = app.newTranslator(preferences.value.copy(sourceLanguage = session.sourceLang, targetLanguage = session.targetLang))
                 try {

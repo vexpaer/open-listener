@@ -56,6 +56,7 @@ class TranslationQueueTest {
         override suspend fun update(segment: SegmentEntity) = Unit
         override suspend fun get(sessionId: String, sequence: Long): SegmentEntity? = null
         override fun observeForSession(sessionId: String) = kotlinx.coroutines.flow.emptyFlow<List<SegmentEntity>>()
+        override suspend fun incompleteForSession(sessionId: String) = emptyList<SegmentEntity>()
         override suspend fun listForSession(sessionId: String) = emptyList<SegmentEntity>()
         override suspend fun updateTranslation(sessionId: String, sequence: Long, translated: String?, status: String, revision: Int?) { writes += sequence to translated; revisions += revision }
         override suspend fun deleteForSession(sessionId: String) = Unit

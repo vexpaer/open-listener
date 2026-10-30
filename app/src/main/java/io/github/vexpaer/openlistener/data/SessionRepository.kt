@@ -18,6 +18,10 @@ class SessionRepository(private val sessions: SessionDao, private val segments: 
     suspend fun saveFinalSegment(sessionId: String, sequence: Long, startOffsetMs: Long,
         endOffsetMs: Long?, original: String, revision: Int = 0): Boolean = segments.putFinal(
         SegmentEntity(sessionId, sequence, startOffsetMs, endOffsetMs, original, null, "PENDING", revision))
+    suspend fun saveBilingualFinal(event: io.github.vexpaer.openlistener.asr.TranscriptEvent) = segments.putBilingualFinal(
+        SegmentEntity(event.sessionId, event.segmentId, event.startOffsetMs, event.endOffsetMs, event.text,
+            event.translated, if (event.translationFinal) "COMPLETED" else if (event.translated != null) "STREAMING" else "PENDING", event.revision))
+    suspend fun markIncompleteTranslations(id: String) = segments.markIncomplete(id)
     suspend fun updateTranslation(sessionId: String, sequence: Long, translated: String?, status: String, revision: Int? = null) =
         segments.updateTranslation(sessionId, sequence, translated, status, revision)
     suspend fun finishSession(id: String, state: String, durationMs: Long, endedAt: Long? = System.currentTimeMillis()) {

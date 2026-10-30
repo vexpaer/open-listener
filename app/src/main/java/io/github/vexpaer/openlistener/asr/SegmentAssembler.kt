@@ -21,7 +21,7 @@ class SegmentAssembler {
             if (existing != null || partial?.let { it.segmentId == event.segmentId && it.revision > event.revision } == true) return false
             partial = event
         } else {
-            if (existing != null && (event.revision < existing.revision || event.text == existing.text)) return false
+            if (existing != null && (event.revision < existing.revision || (event.text == existing.text && event.translated == existing.translated && event.translationFinal == existing.translationFinal))) return false
             confirmed[event.segmentId] = event
             if (partial?.segmentId == event.segmentId) partial = null
             while (confirmed.size > 128) confirmed.remove(confirmed.keys.first())

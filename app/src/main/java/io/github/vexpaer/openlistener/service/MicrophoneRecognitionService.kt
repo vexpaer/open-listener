@@ -83,11 +83,11 @@ class MicrophoneRecognitionService : Service() {
         val prefs = app.preferences.preferences.first()
         engine = app.newAsr(prefs)
         require(prefs.sourceLanguage in engine!!.capabilities.languages) { "Selected speech engine does not support this source language" }
-        translator = app.newTranslator(prefs)
+        translator = if (engine!!.capabilities.providesTranslation) null else app.newTranslator(prefs)
         check(engine!!.prepare() == EngineAvailability.Ready) { "Speech engine needs a model or credentials; open Settings" }
-        check(translator!!.prepare() == EngineAvailability.Ready) { "Translation engine needs language models or credentials; open Settings" }
+        check(translator == null || translator!!.prepare() == EngineAvailability.Ready) { "Translation engine needs language models or credentials; open Settings" }
         id = app.repository.startSession("Lecture · " + SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(System.currentTimeMillis()),
-            prefs.sourceLanguage, prefs.targetLanguage, prefs.asrProvider, prefs.translationProvider)
+            prefs.sourceLanguage, prefs.targetLanguage, prefs.asrProvider, if (engine!!.capabilities.providesTranslation) "doubao_ast" else prefs.translationProvider)
         if (prefs.retainAudio) {
             val directory = java.io.File(filesDir, "recordings").apply { check(isDirectory || mkdirs()) }
             val file = java.io.File(directory, "${id!!}.wav")
@@ -95,7 +95,7 @@ class MicrophoneRecognitionService : Service() {
             app.repository.setAudioPath(id!!, file.absolutePath)
         }
         RecognitionRuntime.begin(id!!)
-        queue = TranslationQueue(translator!!, app.repository, prefs.sourceLanguage, prefs.targetLanguage, scope, ::reportFailure)
+        translator?.let { queue = TranslationQueue(it, app.repository, prefs.sourceLanguage, prefs.targetLanguage, scope, ::reportFailure) }
         events = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
                 engine!!.events.collect { event ->
@@ -105,7 +105,8 @@ class MicrophoneRecognitionService : Service() {
                             if (RecognitionRuntime.partial.value?.segmentId == event.segmentId) RecognitionRuntime.updatePartial(null)
                         } else {
                             if (RecognitionRuntime.partial.value?.segmentId == event.segmentId) RecognitionRuntime.updatePartial(null)
-                            if (app.repository.saveFinalSegment(event.sessionId, event.segmentId, event.startOffsetMs,
+                            if (engine!!.capabilities.providesTranslation) app.repository.saveBilingualFinal(event)
+                            else if (app.repository.saveFinalSegment(event.sessionId, event.segmentId, event.startOffsetMs,
                                 event.endOffsetMs, event.text, event.revision)) queue?.offer(event)
                         }
                     }
@@ -118,6 +119,9 @@ class MicrophoneRecognitionService : Service() {
         }
         (engine as? CloudChunkAsr)?.let { cloud ->
             errors = scope.launch { cloud.errors.collect { error -> reportFailure(error) } }
+        }
+        (engine as? DoubaoSimultaneousAsr)?.let { cloud ->
+            errors = scope.launch { cloud.errors.collect { error -> if (error != null && !terminating) reportFailure(error) } }
         }
         engine!!.start(id!!)
         startConsumer()
@@ -201,6 +205,7 @@ class MicrophoneRecognitionService : Service() {
                 errors?.cancelAndJoin()
                 cleanup { queue?.drain(8_000) }
                 cleanup { translator?.close() }
+                if (engine?.capabilities?.providesTranslation == true) cleanup { id?.let { app.repository.markIncompleteTranslations(it) } }
                 RecognitionRuntime.end()
                 cleanup {
                     id?.let { app.repository.finishSession(it, terminalState.name, RecognitionRuntime.elapsedMs.value) }

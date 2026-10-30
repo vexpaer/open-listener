@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.7 · 2026-10-30
+
+- Reduce the tab equalizer to 15% opacity.
+- Follow the actual transcript tail, including growing partials/translations; pause on manual history browsing and resume at the bottom.
+- Add Doubao AST 2.0 S2T with protobuf transport, paired source/translation subtitles, final acknowledgements and pause/resume session handling.
+- Bypass the separate translator for integrated speech and persist bilingual updates atomically.
+
 ## 0.1.6 · 2026-10-30
 
 - Compact settings rows and local model cards; side-by-side update actions.

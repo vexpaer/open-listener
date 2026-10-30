@@ -54,6 +54,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                 }
                 Text(if (current.startsWith("asr")) tr("语音识别", "Speech recognition") else tr("文字翻译", "Translation"), style = MaterialTheme.typography.titleMedium)
             }
+            if (current != "translation-integrated") {
             val speech = current.startsWith("asr")
             val local = current.endsWith("local")
             ModelCategories(local, editingAllowed, if (speech) "asr" else "translation", onLocal = {
@@ -64,6 +65,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                 if (!speech && prefs.translationProvider == "mlkit") model.setProviders(prefs.asrProvider, "doubao")
                 page = if (speech) "asr-cloud" else "translation-cloud"
             })
+            }
         }
         LazyColumn(state = if (page == null) list else sublist,
             modifier = Modifier.weight(1f).testTag(if (page == null) "settings-page" else "settings-model-page"),
@@ -83,7 +85,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                                 onClick = { page = if (prefs.asrProvider == "local") "asr-local" else "asr-cloud" })
                             HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f))
                             CompactSettingRow(tr("文字翻译", "Translation"), Icons.Outlined.Translate, "translation-settings",
-                                onClick = { page = if (prefs.translationProvider == "mlkit") "translation-local" else "translation-cloud" })
+                                onClick = { page = if (prefs.asrProvider == "doubao_ast") "translation-integrated" else if (prefs.translationProvider == "mlkit") "translation-local" else "translation-cloud" })
                             HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f))
                             Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Outlined.GraphicEq, null, Modifier.size(21.dp), tint = MaterialTheme.colorScheme.primary)
@@ -199,20 +201,31 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                 "asr-cloud" -> item {
                     SettingsSection(tr("服务商", "Provider"), Icons.Outlined.Cloud) {
                         SettingChoice(tr("模型服务", "Model service"), listOf("doubao" to tr("豆包", "Doubao"),
-                            "qwen" to tr("阿里云", "Aliyun"), "openai" to "OpenAI", "custom" to tr("自定义", "Custom")),
+                            "doubao_ast" to tr("豆包同传", "Doubao AST"), "qwen" to tr("阿里云", "Aliyun"), "openai" to "OpenAI", "custom" to tr("自定义", "Custom")),
                             prefs.asrProvider, enabled = editingAllowed) { model.setProviders(it, prefs.translationProvider) }
-                        val provider = if (prefs.asrProvider == "doubao") "doubao" else "asr_${prefs.asrProvider}"
+                        val provider = if (prefs.asrProvider in setOf("doubao", "doubao_ast")) prefs.asrProvider else "asr_${prefs.asrProvider}"
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick = { credentialsFor = provider }, enabled = editingAllowed, modifier = Modifier.testTag("asr-credentials")) {
                                 Text(tr("配置 API", "Configure API"))
                             }
                             ApiHelpButton("asr-api-help") { guideFor = provider }
                         }
-                        Hint(tr("豆包为实时识别；其他服务按短音频分段识别。模型 ID 可自由填写，需支持所选接口。", "Doubao streams live; other providers transcribe short audio chunks. Enter any model ID supported by the selected API."))
+                        Hint(if (prefs.asrProvider == "doubao_ast") tr("同传 2.0 · 直接生成原文与译文字幕，不播报译音。", "AST 2.0 · Original and translated subtitles, without spoken output.")
+                            else tr("豆包为实时识别；其他服务按短音频分段识别。模型 ID 可自由填写，需支持所选接口。", "Doubao streams live; other providers transcribe short audio chunks. Enter any model ID supported by the selected API."))
                         OutlinedButton(onClick = model::checkSelectedEngines, enabled = !check.busy) {
                             Text(if (check.busy) tr("检查中…", "Checking…") else tr("检查配置", "Check setup"))
                         }
                         check.detail?.let { Hint(it) }
+                    }
+                }
+                "translation-integrated" -> item {
+                    SettingsSection(tr("豆包同声传译", "Doubao simultaneous translation"), Icons.Outlined.Translate) {
+                        Text(tr("原文与译文由同传模型直接生成。", "The simultaneous model generates both original and translated subtitles."), style = MaterialTheme.typography.bodyMedium)
+                        Hint(tr("仅输出文字。源语言与目标语言可在设置首页修改。", "Text output only. Choose spoken and target languages on the settings overview."))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedButton(onClick = { credentialsFor = "doubao_ast" }, enabled = editingAllowed) { Text(tr("配置 API", "Configure API")) }
+                            ApiHelpButton("ast-translation-help") { guideFor = "doubao_ast" }
+                        }
                     }
                 }
                 "translation-local" -> item {
@@ -266,6 +279,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
 @Composable
 private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, enabled: Boolean, onHelp: () -> Unit, onDismiss: () -> Unit) {
     val asr = provider == "doubao"
+    val ast = provider == "doubao_ast"
     val defaultBase = when (provider) {
         "translation_doubao" -> "https://ark.cn-beijing.volces.com/api/v3"
         "translation_qwen" -> "https://dashscope.aliyuncs.com/compatible-mode/v1"
@@ -275,14 +289,14 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
     }
     val defaultModel = when (provider) { "translation_qwen" -> "qwen-plus"; "translation_openai" -> "gpt-4.1-mini"; "asr_openai" -> "gpt-transcribe"; "asr_qwen" -> "qwen3-asr-flash"; else -> "" }
     // Deliberately not rememberSaveable: secrets must never enter Activity saved-state bundles.
-    var key by remember(provider) { mutableStateOf(model.credential(provider, "api_key")) }
+    var key by remember(provider) { mutableStateOf(model.credential(provider, "api_key").ifBlank { if (ast) model.credential("doubao", "api_key") else "" }) }
     var resource by remember(provider) { mutableStateOf(model.credential(provider, "resource_id")) }
     var base by remember(provider) { mutableStateOf(model.credential(provider, "base_url").ifBlank { defaultBase }) }
     var modelId by remember(provider) { mutableStateOf(model.credential(provider, "model").ifBlank { defaultModel }) }
-    val valid = key.isNotBlank() && if (asr) resource.isNotBlank() else base.startsWith("https://") && modelId.isNotBlank()
+    val valid = key.isNotBlank() && if (asr) resource.isNotBlank() else if (ast) true else base.startsWith("https://") && modelId.isNotBlank()
     AlertDialog(onDismissRequest = onDismiss, title = {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(if (asr) tr("豆包实时语音", "Doubao streaming speech") else if (provider.startsWith("asr_")) tr("语音识别 API", "Speech API") else tr("翻译 API", "Translation API"), modifier = Modifier.weight(1f))
+            Text(if (ast) tr("豆包同声传译", "Doubao simultaneous translation") else if (asr) tr("豆包实时语音", "Doubao streaming speech") else if (provider.startsWith("asr_")) tr("语音识别 API", "Speech API") else tr("翻译 API", "Translation API"), modifier = Modifier.weight(1f))
             ApiHelpButton("credentials-api-help", onHelp)
         }
     },
@@ -291,7 +305,9 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
                 Hint(tr("密钥在本机加密保存", "Keys are encrypted on this device"))
                 SecretField(key, { key = it }, if (asr) "X-Api-Key" else "API key", true)
                 if (asr) SecretField(resource, { resource = it }, "X-Api-Resource-Id", true)
-                else {
+                else if (ast) {
+                    Hint(tr("开通同传 2.0 服务后保存 Key。应用使用 S2T 字幕模式。", "Enable AST 2.0, then save the key. The app uses S2T subtitle mode."))
+                } else {
                     SecretField(base, { base = it }, "Base URL · HTTPS", false)
                     SecretField(modelId, { modelId = it }, "Model / Endpoint ID", false)
                     Hint(if (provider.startsWith("asr_")) tr("填写 API 根路径和语音模型 ID。OpenAI / 自定义使用 /audio/transcriptions，阿里云使用 Qwen-ASR /chat/completions。", "Enter the API root and speech model ID. OpenAI / Custom use /audio/transcriptions; Aliyun uses Qwen-ASR /chat/completions.") else tr("Base URL 为 API 根路径，不含 /chat/completions。豆包需填写自己的模型或 ep ID。", "Use the API root, without /chat/completions. Doubao requires your own model or ep ID."))
@@ -299,7 +315,7 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
             }
         }, confirmButton = {
             TextButton(onClick = {
-                model.saveCredentials(provider, if (asr) mapOf("api_key" to key, "resource_id" to resource) else mapOf("api_key" to key, "base_url" to base, "model" to modelId))
+                model.saveCredentials(provider, if (ast) mapOf("api_key" to key) else if (asr) mapOf("api_key" to key, "resource_id" to resource) else mapOf("api_key" to key, "base_url" to base, "model" to modelId))
                 onDismiss(); model.checkSelectedEngines()
             }, enabled = enabled && (valid || key.isBlank())) { Text(tr("加密保存", "Save encrypted")) }
         }, dismissButton = { TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) } })

@@ -106,6 +106,31 @@ class ForegroundSessionAndroidTest {
         }
     }
 
+    @Test fun integratedSpeechPersistsBothTexts_withoutAnySecondTranslator() = runBlocking {
+        app.recovery.await()
+        app.preferences.setRetainAudio(false)
+        app.preferences.setLanguages("en", "zh-CN")
+        app.preferences.setProviders("doubao_ast", "custom")
+        app.syntheticSession = true; app.syntheticBilingual = true
+        val activity = ActivityScenario.launch<MainActivity>(Intent(app, MainActivity::class.java))
+        try {
+            activity.onActivity { current -> ContextCompat.startForegroundService(current,
+                Intent(current, MicrophoneRecognitionService::class.java).setAction(MicrophoneRecognitionService.ACTION_START)) }
+            await { RecognitionRuntime.state.value == MicrophoneRecognitionService.State.RECORDING }
+            val id = requireNotNull(RecognitionRuntime.sessionId.value)
+            await { app.repository.listSegments(id).any { it.translationStatus == "COMPLETED" } }
+            val segment = app.repository.listSegments(id).first()
+            assertEquals("仅测试构建中的同传译文", segment.translated)
+            assertEquals("doubao_ast", app.repository.getSession(id)!!.translatorProvider)
+            app.startService(Intent(app, MicrophoneRecognitionService::class.java).setAction(MicrophoneRecognitionService.ACTION_STOP))
+            await { RecognitionRuntime.state.value == MicrophoneRecognitionService.State.FINISHED }
+        } finally {
+            app.startService(Intent(app, MicrophoneRecognitionService::class.java).setAction(MicrophoneRecognitionService.ACTION_STOP))
+            delay(200); activity.close(); app.syntheticSession = false; app.syntheticBilingual = false
+            app.preferences.setProviders("local", "mlkit")
+        }
+    }
+
     private fun shell(command: String) { instrumentation.uiAutomation.executeShellCommand(command).close() }
     private suspend fun await(condition: suspend () -> Boolean) = withTimeout(20_000) { while (!condition()) delay(50) }
 }
