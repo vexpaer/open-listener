@@ -52,6 +52,7 @@ class DoubaoAstTest {
 
     private fun mockConnection(original: String, translated: String, requests: MutableList<Map<Int, Any>>, finish: Boolean = true): MockResponse =
         MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) { webSocket.close(1000, "closed") }
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
                 val request = fields(bytes.toByteArray()); requests += request
                 when (request[2] as Long) {
