@@ -438,7 +438,7 @@ private fun ModelCategories(local: Boolean, enabled: Boolean, tag: String, onLoc
             val shape = if (isLocal) RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp) else RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
             Box(Modifier.weight(1f).height(56.dp).clip(shape).background(selectedColor)
                 .clickable(enabled = enabled) { if (isLocal) onLocal() else onCloud() }
-                .testTag("$" + "tag-" + if (isLocal) "local-models" else "cloud-models"),
+                .testTag("$tag-" + if (isLocal) "local-models" else "cloud-models"),
                 contentAlignment = Alignment.Center) {
                 Text(label, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.titleMedium)
