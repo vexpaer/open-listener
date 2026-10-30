@@ -2,6 +2,17 @@ package io.github.vexpaer.openlistener.ui
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -25,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,7 +89,7 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
                         contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
                         items(segments, key = { "final-${it.sequence}" }) { segment ->
                             TranscriptParagraph(segment, mode, prefs.subtitleFontScale, retrying.contains(segment.sequence),
-                                onCopy = { model.copyText(it) }, onRetry = { model.retryTranslation(segment.sessionId, segment.sequence) })
+                                onCopy = { model.copyText(it) }, onRetry = { model.retryTranslation(segment.sessionId, segment.sequence) }, live = true)
                         }
                         visiblePartial?.let { event -> item(key = "partial-${event.segmentId}") { PartialParagraph(event, mode, prefs.subtitleFontScale) } }
                     }
@@ -118,12 +131,8 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
                         if (state == State.RECORDING) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
                         level = if (foreground && state == State.RECORDING) rms else 0f,
                         onClick = if (state == State.RECORDING) model::pauseListening else model::resumeListening)
-                    Box(Modifier.size(100.dp), contentAlignment = Alignment.Center) {
-                        OutlinedButton(onClick = model::stopListening, shape = CircleShape,
-                            contentPadding = PaddingValues(0.dp), modifier = Modifier.size(80.dp).testTag("stop-listening")) {
-                            Icon(Icons.Outlined.Stop, tr("结束", "Finish"), Modifier.size(30.dp))
-                        }
-                    }
+                    ListeningButton(tr("结束", "Finish"), Icons.Outlined.Stop, 0f, onClick = model::stopListening,
+                        stop = true, tag = "stop-listening")
                 }
                 else -> ListeningButton(tr("开始聆听", "Start listening"), Icons.Outlined.Mic, 0f, !check.busy, model::startListening)
             }
@@ -132,11 +141,11 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
 }
 
 @Composable
-private fun ListeningButton(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, level: Float, enabled: Boolean = true, onClick: () -> Unit) {
+private fun ListeningButton(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, level: Float, enabled: Boolean = true, onClick: () -> Unit, stop: Boolean = false, tag: String = "listen-primary") {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val motion = LocalMotionAllowed.current
-    val scale by animateFloatAsState(if (pressed && motion) .94f else 1f, tween(if (motion) 110 else 0), label = "mic-press")
+    val scale by animateFloatAsState(if (pressed && motion) .92f else 1f, tween(if (motion) 110 else 0), label = "mic-press")
     val signal by animateFloatAsState(level.coerceIn(0f, 1f), tween(if (motion) 100 else 0), label = "real-rms")
     val color = MaterialTheme.colorScheme.primary
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -144,8 +153,19 @@ private fun ListeningButton(label: String, icon: androidx.compose.ui.graphics.ve
             if (signal > .001f) Canvas(Modifier.fillMaxSize()) {
                 drawCircle(color.copy(alpha = .22f + signal * .3f), radius = size.minDimension * (.42f + .06f * signal), style = Stroke((1.5f + signal * 2f).dp.toPx()))
             }
+            val palette = MaterialTheme.colorScheme
+            val top = if (stop) palette.surface else palette.primary.copy(alpha = .88f)
+            val bottom = if (stop) palette.surfaceVariant else palette.primary
             Button(onClick = onClick, enabled = enabled, shape = CircleShape, interactionSource = interaction,
-                contentPadding = PaddingValues(0.dp), modifier = Modifier.size(80.dp).graphicsLayer { scaleX = scale; scaleY = scale }.testTag("listen-primary")) {
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent,
+                    contentColor = if (stop) palette.onSurface else palette.onPrimary,
+                    disabledContainerColor = palette.surfaceVariant),
+                contentPadding = PaddingValues(0.dp), modifier = Modifier.size(80.dp)
+                    .graphicsLayer { scaleX = scale; scaleY = scale; translationY = if (pressed && motion) 2.dp.toPx() else 0f }
+                    .shadow(if (pressed) 2.dp else 9.dp, CircleShape, ambientColor = palette.primary.copy(alpha = .25f), spotColor = palette.primary.copy(alpha = .3f))
+                    .clip(CircleShape).background(Brush.verticalGradient(listOf(top, bottom)))
+                    .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = .55f), palette.primary.copy(alpha = .12f))), CircleShape)
+                    .testTag(tag)) {
                 Icon(icon, contentDescription = label, modifier = Modifier.size(30.dp))
             }
         }
@@ -166,21 +186,17 @@ private fun DisplayModes(mode: TranscriptMode, onSelect: (TranscriptMode) -> Uni
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun TranscriptParagraph(segment: SegmentEntity, mode: TranscriptMode, fontScale: Float, retrying: Boolean, onCopy: (String) -> Unit, onRetry: () -> Unit) {
-    val motion = LocalMotionAllowed.current
-    var revealed by remember(segment.sequence) { mutableStateOf(false) }
-    LaunchedEffect(segment.translated) { if (segment.translated != null) revealed = true }
-    val fade by animateFloatAsState(if (revealed) 1f else .3f, tween(if (motion) 200 else 0), label = "translation-arrival")
+private fun TranscriptParagraph(segment: SegmentEntity, mode: TranscriptMode, fontScale: Float, retrying: Boolean, onCopy: (String) -> Unit, onRetry: () -> Unit, live: Boolean = false) {
     Column(Modifier.fillMaxWidth().combinedClickable(onClick = {}, onLongClick = { onCopy(listOfNotNull(segment.original, segment.translated).joinToString("\n")) }),
         verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (mode != TranscriptMode.TRANSLATION) SelectionContainer {
-            Text(segment.original, style = MaterialTheme.typography.bodyLarge.copy(fontSize = (17 * fontScale).sp, lineHeight = (27 * fontScale).sp))
+            ArrivalText(segment.original, live, MaterialTheme.typography.bodyLarge.copy(fontSize = (17 * fontScale).sp, lineHeight = (27 * fontScale).sp))
         }
         if (mode != TranscriptMode.ORIGINAL) {
             if (segment.translated != null) SelectionContainer {
-                Text(segment.translated, color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = (18 * fontScale).sp, lineHeight = (28 * fontScale).sp),
-                    modifier = Modifier.alpha(fade).heightIn(min = 28.dp))
+                ArrivalText(segment.translated, live,
+                    MaterialTheme.typography.bodyLarge.copy(fontSize = (18 * fontScale).sp, lineHeight = (28 * fontScale).sp),
+                    color = MaterialTheme.colorScheme.primary, modifier = Modifier.heightIn(min = 28.dp))
             } else {
                 val failed = segment.translationStatus.contains("FAIL", true) || segment.translationStatus.contains("ERROR", true)
                 Text(if (failed) tr("翻译失败，原文已保存。请检查模型、网络或凭据。", "Translation failed; original text is saved. Check models, network or credentials.")
@@ -195,10 +211,8 @@ private fun TranscriptParagraph(segment: SegmentEntity, mode: TranscriptMode, fo
 @Composable
 private fun PartialParagraph(event: TranscriptEvent, mode: TranscriptMode, fontScale: Float) {
     if (mode == TranscriptMode.TRANSLATION) return
-    val opacity by animateFloatAsState(.68f, tween(if (LocalMotionAllowed.current) 160 else 0), label = "partial-opacity")
-    Column(Modifier.alpha(opacity), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(event.text, style = MaterialTheme.typography.bodyLarge.copy(fontSize = (17 * fontScale).sp, lineHeight = (27 * fontScale).sp))
-    }
+    ArrivalText(event.text, true, MaterialTheme.typography.bodyLarge.copy(fontSize = (17 * fontScale).sp, lineHeight = (27 * fontScale).sp),
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = .72f))
 }
 
 @Composable
@@ -244,19 +258,32 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
     var mode by rememberSaveable { mutableStateOf(TranscriptMode.BILINGUAL) }
     var rename by rememberSaveable { mutableStateOf(false) }
     var delete by rememberSaveable { mutableStateOf(false) }
+    var shareMenu by rememberSaveable(id) { mutableStateOf(false) }
     var title by rememberSaveable(id) { mutableStateOf("") }
     val list = rememberLazyListState()
+    val shareLabel = tr("分享与导出", "Share and export")
     Column(Modifier.fillMaxSize().testTag("session-detail")) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, tr("返回记录", "Back to Library")) }
             Text(tr("文字记录", "Text record"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Box {
+                IconButton(onClick = { shareMenu = true }, enabled = session != null, modifier = Modifier.testTag("record-share").semantics { contentDescription = shareLabel }) { Text("📤", fontSize = 21.sp) }
+                DropdownMenu(shareMenu, { shareMenu = false }, modifier = Modifier.testTag("record-share-menu")) {
+                    DropdownMenuItem(text = { Text(tr("复制全文", "Copy all")) }, onClick = { shareMenu = false; model.copySession(id) })
+                    DocumentFormat.entries.forEach { format ->
+                        DropdownMenuItem(text = { Text("${tr("导出", "Save")} ${format.extension.uppercase()}") }, onClick = { shareMenu = false; model.requestExport(id, format) })
+                        DropdownMenuItem(text = { Text("${tr("分享", "Share")} ${format.extension.uppercase()}") }, onClick = { shareMenu = false; model.shareSession(id, format) })
+                    }
+                }
+            }
             IconButton(onClick = { title = session?.title.orEmpty(); rename = true }, enabled = session != null) { Icon(Icons.Outlined.Edit, tr("修改标题", "Rename")) }
             IconButton(onClick = { delete = true }, enabled = session != null) { Icon(Icons.Outlined.DeleteOutline, tr("删除记录", "Delete record")) }
         }
         val current = session
         if (current == null) {
             EmptyReading(Icons.Outlined.Description, tr("正在读取记录", "Loading record"), tr("文字保存在此设备。", "Text is stored on this device."))
-        } else LazyColumn(state = list, modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(bottom = 28.dp)) {
+        } else ReadingSurface {
+            LazyColumn(state = list, modifier = Modifier.fillMaxSize().testTag("record-reading-area"), verticalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(18.dp)) {
             item {
                 Text(current.title, style = MaterialTheme.typography.headlineSmall)
                 Text("${date(current.startedAt)} · ${formatTime(current.durationMs)} · ${sessionStatus(current.state)}", style = MaterialTheme.typography.bodySmall,
@@ -264,21 +291,16 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
                 DisplayModes(mode, { mode = it })
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (current.audioPath != null && current.state !in listOf("PREPARING", "RECORDING", "PAUSED", "STOPPING")) RecordingPlayback(current.audioPath)
-                    TextButton(onClick = { model.copySession(id) }) { Icon(Icons.Outlined.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(tr("复制全文", "Copy all")) }
-                    DocumentFormat.entries.forEach { format ->
-                        TextButton(onClick = { model.requestExport(id, format) }) { Text("${tr("导出", "Save")} ${format.extension.uppercase()}") }
-                        TextButton(onClick = { model.shareSession(id, format) }) { Text("${tr("分享", "Share")} ${format.extension.uppercase()}") }
-                    }
+
                 }
             }
             if (segments.isEmpty()) item { Text(tr("这场聆听没有已确认的文字。", "This session has no confirmed text."), color = MaterialTheme.colorScheme.onSurfaceVariant) }
             items(segments, key = { it.sequence }) { segment ->
-                ReadingSurface { Box(Modifier.padding(18.dp)) {
-                    TranscriptParagraph(segment, mode, prefs.subtitleFontScale, retrying.contains(segment.sequence), model::copyText,
-                        onRetry = { model.retryTranslation(id, segment.sequence) })
-                } }
+                TranscriptParagraph(segment, mode, prefs.subtitleFontScale, retrying.contains(segment.sequence), model::copyText,
+                    onRetry = { model.retryTranslation(id, segment.sequence) })
             }
         }
+    }
     }
     if (rename) AlertDialog(onDismissRequest = { rename = false }, title = { Text(tr("修改标题", "Rename record")) }, text = {
         OutlinedTextField(title, { title = it.take(160) }, label = { Text(tr("标题", "Title")) }, modifier = Modifier.fillMaxWidth())
@@ -350,4 +372,31 @@ private fun RecordingPlayback(path: String) {
         Text(if (loading) tr("🎧 加载中…", "🎧 Loading…") else if (playing) tr("⏸ 暂停录音", "⏸ Pause recording") else tr("🎧 播放录音", "🎧 Play recording"))
     }
     if (failed) Text(tr("无法播放此录音", "Unable to play recording"), color = MaterialTheme.colorScheme.error)
+}
+
+/** Each newly arrived character fades over 90 ms; an unchanged prefix stays opaque. */
+@Composable
+internal fun ArrivalText(value: String, live: Boolean, style: TextStyle, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurface) {
+    val motion = live && LocalMotionAllowed.current
+    var previous by remember { mutableStateOf("") }
+    val prefix = remember(value) { previous.commonPrefixWith(value).length }
+    var started by remember(value) { mutableStateOf(false) }
+    val clock = remember { Animatable(0f) }
+    LaunchedEffect(value, motion) {
+        previous = value
+        if (motion) {
+            clock.snapTo(0f)
+            started = true
+            val duration = 90 + minOf((value.length - prefix).coerceAtLeast(0), 30) * 12
+            clock.animateTo(duration.toFloat(), tween(duration, easing = LinearEasing))
+        }
+    }
+    val text = if (!motion) androidx.compose.ui.text.AnnotatedString(value) else buildAnnotatedString {
+        append(value)
+        for (index in prefix until value.length) {
+            val opacity = (((if (started) clock.value else 0f) - minOf(index - prefix, 30) * 12) / 90f).coerceIn(0f, 1f)
+            addStyle(SpanStyle(color = color.copy(alpha = color.alpha * opacity)), index, index + 1)
+        }
+    }
+    Text(text, color = color, style = style, modifier = modifier)
 }

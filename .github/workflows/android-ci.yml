@@ -68,10 +68,7 @@ jobs:
           target: google_apis
           profile: pixel_6
           disable-animations: true
-          script: |
-            ./gradlew --no-daemon connectedDebugAndroidTest
-            mkdir -p screenshots
-            printf '%s\n' 'Instrumentation reports are authoritative; connectedAndroidTest may clean app-private screenshot files before extraction.' > screenshots/README.txt
+          script: bash tools/run_instrumentation.sh
       - name: Upload emulator evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

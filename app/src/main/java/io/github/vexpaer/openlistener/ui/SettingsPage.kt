@@ -19,6 +19,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import io.github.vexpaer.openlistener.BuildConfig
 import io.github.vexpaer.openlistener.ui.theme.LocalDarkAppearance
 import io.github.vexpaer.openlistener.models.ModelPhase
@@ -66,7 +67,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
         }
         LazyColumn(state = if (page == null) list else sublist,
             modifier = Modifier.weight(1f).testTag(if (page == null) "settings-page" else "settings-model-page"),
-            verticalArrangement = Arrangement.spacedBy(24.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
+            verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
             if (page == null) {
                 item {
                     SettingsSection(tr("目标语言", "Target language"), Icons.Outlined.Language) {
@@ -76,29 +77,19 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                     }
                 }
                 item {
-                    SettingsSection(tr("语音识别", "Speech recognition"), Icons.Outlined.Mic) {
-                        OutlinedButton(onClick = { page = if (prefs.asrProvider == "local") "asr-local" else "asr-cloud" },
-                            modifier = Modifier.fillMaxWidth().testTag("asr-settings")) {
-                            Text(tr("识别引擎与模型", "Engines & models"), Modifier.weight(1f)); Icon(Icons.Outlined.ChevronRight, null)
-                        }
-                    }
-                }
-                item {
-                    SettingsSection(tr("文字翻译", "Translation"), Icons.Outlined.Language) {
-                        OutlinedButton(onClick = { page = if (prefs.translationProvider == "mlkit") "translation-local" else "translation-cloud" },
-                            modifier = Modifier.fillMaxWidth().testTag("translation-settings")) {
-                            Text(tr("翻译引擎与模型", "Engines & models"), Modifier.weight(1f)); Icon(Icons.Outlined.ChevronRight, null)
-                        }
-                    }
-                }
-                item {
-                    SettingsSection(tr("录音保存", "Audio storage"), Icons.Outlined.Mic) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(tr("保留录音", "Keep recordings"))
-                                Hint(tr("开启后，新录音将随记录保存在此设备。", "Keep audio on this device for new sessions."))
+                    ReadingSurface {
+                        Column(Modifier.fillMaxWidth()) {
+                            CompactSettingRow(tr("语音识别", "Speech recognition"), Icons.Outlined.Mic, "asr-settings",
+                                onClick = { page = if (prefs.asrProvider == "local") "asr-local" else "asr-cloud" })
+                            HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f))
+                            CompactSettingRow(tr("文字翻译", "Translation"), Icons.Outlined.Translate, "translation-settings",
+                                onClick = { page = if (prefs.translationProvider == "mlkit") "translation-local" else "translation-cloud" })
+                            HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f))
+                            Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Outlined.GraphicEq, null, Modifier.size(21.dp), tint = MaterialTheme.colorScheme.primary)
+                                Text(tr("语音保存", "Keep recordings"), Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.titleMedium)
+                                Switch(prefs.retainAudio, model::setRetainAudio, enabled = editingAllowed, modifier = Modifier.testTag("retain-audio"))
                             }
-                            Switch(prefs.retainAudio, model::setRetainAudio, enabled = editingAllowed, modifier = Modifier.testTag("retain-audio"))
                         }
                     }
                 }
@@ -116,11 +107,11 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                 item {
                     SettingsSection(tr("更新与关于", "Updates & about"), Icons.Outlined.SystemUpdate) {
                         Text("Open Listener  v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.titleMedium)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(Modifier.fillMaxWidth().testTag("update-actions"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick = model::checkUpdates, enabled = !updates.checking && !updates.downloading,
-                                modifier = Modifier.testTag("check-updates")) { Text(if (updates.checking) tr("检查中…", "Checking…") else tr("检查新版本", "Check for updates")) }
+                                modifier = Modifier.weight(1f).testTag("check-updates"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text(if (updates.checking) tr("检查中…", "Checking…") else tr("检查更新", "Check updates"), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) }
                             OutlinedButton(onClick = model::downloadUpdate, enabled = updates.update != null && !updates.downloading && !updates.checking && editingAllowed && updates.file == null,
-                                modifier = Modifier.testTag("download-update")) { Text(tr("下载新版本", "Download update")) }
+                                modifier = Modifier.weight(1f).testTag("download-update"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text(tr("下载更新", "Download"), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) }
                         }
                         when {
                             updates.checking -> LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -153,33 +144,47 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                     model.modelCatalog.forEach { manifest ->
                         item(key = "model-${manifest.id}") {
                             ReadingSurface {
-                                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Text(manifest.displayName, style = MaterialTheme.typography.titleMedium)
-                                    FilterChip(prefs.localAsrModel == manifest.id, onClick = { model.setLocalAsrModel(manifest.id) },
-                                        enabled = editingAllowed, label = { Text(if (prefs.localAsrModel == manifest.id) tr("已选择", "Selected") else tr("选择模型", "Select model")) })
-                                    Hint("${manifest.languages.joinToString(" / ")} · ${if (manifest.streaming) tr("真流式", "Streaming") else tr("分段识别", "Segmented")} · ${bytes(manifest.bytes)}")
+                                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     val status = modelStates[manifest.id]
                                     val phase = status?.phase ?: ModelPhase.NOT_INSTALLED
-                                    Text(phaseLabel(phase), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                                    var more by remember { mutableStateOf(false) }
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(manifest.displayName.replace(" (INT8)", ""), style = MaterialTheme.typography.titleSmall)
+                                            Text("${bytes(manifest.bytes)} · ${phaseLabel(phase)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        if (phase == ModelPhase.INSTALLED) {
+                                            IconButton(onClick = { model.setLocalAsrModel(manifest.id) }, enabled = editingAllowed,
+                                                modifier = Modifier.testTag("select-model-${manifest.id}")) {
+                                                Icon(if (prefs.localAsrModel == manifest.id) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+                                                    tr("选择模型", "Select model"), tint = MaterialTheme.colorScheme.primary)
+                                            }
+                                        } else if (phase in listOf(ModelPhase.NOT_INSTALLED, ModelPhase.ERROR)) {
+                                            IconButton(onClick = { model.downloadModel(manifest.id) }, enabled = editingAllowed,
+                                                modifier = Modifier.testTag("download-asr-model-${manifest.id}")) {
+                                                Icon(Icons.Outlined.Download, tr("下载模型", "Download model"), tint = MaterialTheme.colorScheme.primary)
+                                            }
+                                        }
+                                        Box {
+                                            IconButton(onClick = { more = true }) { Icon(Icons.Outlined.MoreHoriz, tr("模型选项", "Model options")) }
+                                            DropdownMenu(more, { more = false }) {
+                                                DropdownMenuItem(text = { Text(tr("来源", "Source")) }, onClick = { more = false; model.openUrl(manifest.sourceUrl) })
+                                                DropdownMenuItem(text = { Text(tr("许可证", "License")) }, onClick = { more = false; model.openUrl(manifest.licenseUrl) })
+                                                if (phase == ModelPhase.INSTALLED) DropdownMenuItem(text = { Text(tr("删除模型", "Delete model")) },
+                                                    enabled = editingAllowed && status?.inUse != true, onClick = { more = false; deleteModel = manifest.id })
+                                            }
+                                        }
+                                    }
                                     if (phase == ModelPhase.DOWNLOADING) {
                                         val downloaded = status?.downloadedBytes ?: 0
                                         val total = status?.totalBytes ?: manifest.bytes
                                         LinearProgressIndicator(progress = { if (total > 0) (downloaded.toFloat() / total).coerceIn(0f, 1f) else 0f }, modifier = Modifier.fillMaxWidth())
-                                        Hint("${bytes(downloaded)} / ${bytes(total)}")
-                                        TextButton(onClick = { model.cancelModelDownload(manifest.id) }) { Text(tr("取消下载", "Cancel download")) }
-                                    } else if (phase in listOf(ModelPhase.VERIFYING, ModelPhase.EXTRACTING, ModelPhase.VALIDATING)) {
-                                        LinearProgressIndicator(Modifier.fillMaxWidth())
-                                    } else if (phase == ModelPhase.INSTALLED) {
-                                        OutlinedButton(onClick = { deleteModel = manifest.id }, enabled = editingAllowed && status?.inUse != true) { Text(tr("删除模型", "Delete model")) }
-                                    } else {
-                                        OutlinedButton(onClick = { model.downloadModel(manifest.id) }, enabled = editingAllowed,
-                                            modifier = Modifier.testTag("download-asr-model-${manifest.id}")) { Text(if (phase == ModelPhase.ERROR) tr("重试下载", "Retry download") else tr("下载模型", "Download model")) }
-                                    }
+                                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                            Text("${bytes(downloaded)} / ${bytes(total)}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                                            TextButton(onClick = { model.cancelModelDownload(manifest.id) }) { Text(tr("取消", "Cancel")) }
+                                        }
+                                    } else if (phase in listOf(ModelPhase.VERIFYING, ModelPhase.EXTRACTING, ModelPhase.VALIDATING)) LinearProgressIndicator(Modifier.fillMaxWidth())
                                     status?.error?.let { ErrorText(it) }
-                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        TextButton(onClick = { model.openUrl(manifest.sourceUrl) }) { Text(tr("来源", "Source")) }
-                                        TextButton(onClick = { model.openUrl(manifest.licenseUrl) }) { Text(tr("许可证", "License")) }
-                                    }
                                 }
                             }
                         }
@@ -371,5 +376,16 @@ private fun ModelCategories(local: Boolean, enabled: Boolean, tag: String, onLoc
             label = { Text(tr("本地模型", "Local models")) })
         FilterChip(!local, onClick = onCloud, enabled = enabled, modifier = Modifier.testTag("$tag-cloud-models"),
             label = { Text(tr("云端模型", "Cloud models")) })
+    }
+}
+
+@Composable
+private fun CompactSettingRow(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, tag: String, onClick: () -> Unit) {
+    Surface(onClick = onClick, color = androidx.compose.ui.graphics.Color.Transparent, modifier = Modifier.fillMaxWidth().testTag(tag)) {
+        Row(Modifier.heightIn(min = 64.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, Modifier.size(21.dp), tint = MaterialTheme.colorScheme.primary)
+            Text(title, Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.titleMedium)
+            Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

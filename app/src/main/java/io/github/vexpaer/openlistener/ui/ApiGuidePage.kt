@@ -1,6 +1,14 @@
 package io.github.vexpaer.openlistener.ui
 
 import android.net.Uri
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -40,22 +48,41 @@ internal fun ApiGuidePage(provider: String, savedBaseUrl: String, onOpenUrl: (St
                     }
                     Text(tr("API 配置教程", "API setup guide"), style = MaterialTheme.typography.titleLarge)
                 }
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(vertical = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(22.dp)) {
-                    Text(guide.title, style = MaterialTheme.typography.headlineSmall)
-                    guide.steps.forEachIndexed { index, step ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                            Text("${index + 1}", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                            Text(step, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 12.dp, bottom = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = .45f)) {
+                        Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = .10f)) {
+                                Icon(Icons.Outlined.Cloud, null, Modifier.padding(12.dp).size(24.dp), tint = MaterialTheme.colorScheme.primary)
+                            }
+                            Text(guide.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                            Text(tr("三步完成连接", "Connect in three steps"), style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    HorizontalDivider()
+                    guide.steps.forEachIndexed { index, step ->
+                        Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = .10f)) {
+                                    Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
+                                        Text("0${index + 1}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                Text(step, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                    Text(tr("官方入口", "Official links"), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
                     guide.links.forEachIndexed { index, (title, url) ->
-                        TextButton(onClick = { onOpenUrl(url) }, modifier = Modifier.fillMaxWidth().testTag("api-guide-link-$index"),
-                            contentPadding = PaddingValues(vertical = 8.dp, horizontal = 0.dp)) {
-                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("$title ↗", style = MaterialTheme.typography.titleSmall)
-                                Text(url, style = MaterialTheme.typography.bodySmall)
+                        Surface(onClick = { onOpenUrl(url) }, shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth().testTag("api-guide-link-$index")) {
+                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(title, style = MaterialTheme.typography.titleSmall)
+                                    Text(url, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                Icon(Icons.Outlined.OpenInNew, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }

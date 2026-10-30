@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.6 · 2026-10-30
+
+- Compact settings rows and local model cards; side-by-side update actions.
+- A single share/export menu and continuous transcript reading surface.
+- Redesigned API guides with numbered steps and linked cards.
+- 90 ms character fade-in, tactile gradient recording controls and real microphone-driven tab equalizer at 30% opacity.
+- Screenshot artifacts and UI checks for compact layouts, export menu and recording visualization.
+
 ## 0.1.5 · 2026-10-30
 
 - Swipe navigation for Listen / Library / Settings; clearer English home copy.
