@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.9 · 2026-10-30
+
+- Apply the selected theme tones to the full ambient gradient and light blooms in both appearances.
+- Double ambient motion speed (80-second cycle).
+- Replace the inline HEX field and pink preset with a rainbow color-wheel entry and brightness control.
+- Join Local / Cloud tabs and their content with square meeting edges with a horizontally sliding selection.
+- Replace the record share emoji with a theme-tinted upload outline icon.
+- Refresh bilingual README and release notes.
+
 ## 0.1.7 · 2026-10-30
 
 - Reduce the tab equalizer to 15% opacity.

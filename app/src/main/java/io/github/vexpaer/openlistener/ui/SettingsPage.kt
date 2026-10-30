@@ -7,6 +7,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.LazyColumn
@@ -50,6 +54,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
     var deleteModel by rememberSaveable { mutableStateOf<String?>(null) }
     var font by remember(prefs.subtitleFontScale) { mutableFloatStateOf(prefs.subtitleFontScale) }
     LaunchedEffect(Unit) { model.refreshLanguageModels() }
+    var showColorPicker by rememberSaveable { mutableStateOf(false) }
     var page by rememberSaveable { mutableStateOf<String?>(null) }
     val sublist = key(page) { rememberLazyListState() }
     BackHandler(enabled = active && page != null) { page = null }
@@ -61,231 +66,240 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                 }
                 Text(if (current.startsWith("asr")) tr("语音识别", "Speech recognition") else tr("文字翻译", "Translation"), style = MaterialTheme.typography.titleMedium)
             }
-            if (current != "translation-integrated") {
-            val speech = current.startsWith("asr")
-            val local = current.endsWith("local")
-            ModelCategories(local, editingAllowed, if (speech) "asr" else "translation", onLocal = {
-                if (speech) model.setProviders("local", prefs.translationProvider) else model.setProviders(prefs.asrProvider, "mlkit")
-                page = if (speech) "asr-local" else "translation-local"
-            }, onCloud = {
-                if (speech && prefs.asrProvider == "local") model.setProviders("doubao", prefs.translationProvider)
-                if (!speech && prefs.translationProvider == "mlkit") model.setProviders(prefs.asrProvider, "doubao")
-                page = if (speech) "asr-cloud" else "translation-cloud"
-            })
-            }
         }
-        LazyColumn(state = if (page == null) list else sublist,
-            modifier = Modifier.weight(1f).testTag(if (page == null) "settings-page" else "settings-model-page"),
-            verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
-            if (page == null) {
-                item {
-                    SettingsSection(tr("目标语言", "Target language"), Icons.Outlined.Language) {
-                        LanguageChoice(tr("语音源语言", "Spoken language"), prefs.sourceLanguage, editingAllowed) { model.setLanguages(it, prefs.targetLanguage) }
-                        LanguageChoice(tr("翻译目标", "Translation target"), prefs.targetLanguage, editingAllowed) { model.setLanguages(prefs.sourceLanguage, it) }
-                        if (!editingAllowed) Hint(tr("结束聆听后可修改", "Finish listening to edit"))
+        val connectedPanel = page != null && page != "translation-integrated"
+        CompositionLocalProvider(LocalConnectedModelPanel provides connectedPanel) {
+            Column(Modifier.weight(1f).fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(if (connectedPanel) MaterialTheme.colorScheme.surface.copy(alpha = .20f) else Color.Transparent)) {
+                page?.let { current ->
+                    if (current != "translation-integrated") {
+                    val speech = current.startsWith("asr")
+                    val local = current.endsWith("local")
+                    ModelCategories(local, editingAllowed, if (speech) "asr" else "translation", onLocal = {
+                        if (speech) model.setProviders("local", prefs.translationProvider) else model.setProviders(prefs.asrProvider, "mlkit")
+                        page = if (speech) "asr-local" else "translation-local"
+                    }, onCloud = {
+                        if (speech && prefs.asrProvider == "local") model.setProviders("doubao", prefs.translationProvider)
+                        if (!speech && prefs.translationProvider == "mlkit") model.setProviders(prefs.asrProvider, "doubao")
+                        page = if (speech) "asr-cloud" else "translation-cloud"
+                    })
                     }
                 }
-                item {
-                    ReadingSurface {
-                        Column(Modifier.fillMaxWidth()) {
-                            CompactSettingRow(tr("语音识别", "Speech recognition"), Icons.Outlined.Mic, "asr-settings",
-                                onClick = { page = if (prefs.asrProvider == "local") "asr-local" else "asr-cloud" })
-                            HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f))
-                            CompactSettingRow(tr("文字翻译", "Translation"), Icons.Outlined.Translate, "translation-settings",
-                                onClick = { page = if (prefs.asrProvider == "doubao_ast") "translation-integrated" else if (prefs.translationProvider == "mlkit") "translation-local" else "translation-cloud" })
-                            HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f))
-                            Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Outlined.GraphicEq, null, Modifier.size(21.dp), tint = MaterialTheme.colorScheme.primary)
-                                Text(tr("语音保存", "Keep recordings"), Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.titleMedium)
-                                Switch(prefs.retainAudio, model::setRetainAudio, enabled = editingAllowed, modifier = Modifier.testTag("retain-audio"))
+                LazyColumn(state = if (page == null) list else sublist,
+                    modifier = Modifier.weight(1f).testTag(if (page == null) "settings-page" else "settings-model-page"),
+                    verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
+                    if (page == null) {
+                        item {
+                            SettingsSection(tr("目标语言", "Target language"), Icons.Outlined.Language) {
+                                LanguageChoice(tr("语音源语言", "Spoken language"), prefs.sourceLanguage, editingAllowed) { model.setLanguages(it, prefs.targetLanguage) }
+                                LanguageChoice(tr("翻译目标", "Translation target"), prefs.targetLanguage, editingAllowed) { model.setLanguages(prefs.sourceLanguage, it) }
+                                if (!editingAllowed) Hint(tr("结束聆听后可修改", "Finish listening to edit"))
                             }
                         }
-                    }
-                }
-                item {
-                    SettingsSection(tr("外观", "Appearance"), Icons.Outlined.WbSunny) {
-                        InlineToggle(tr("主题", "Theme"), "light" to tr("浅色", "Light"), "dark" to tr("深色", "Dark"),
-                            if (LocalDarkAppearance.current) "dark" else "light", model::setTheme)
-                        InlineToggle(tr("界面语言", "App language"), "zh" to "中文", "en" to "English",
-                            if (LocalChinese.current) "zh" else "en", model::setLanguage)
-                        Text(tr("主题颜色", "Accent color"), style = MaterialTheme.typography.labelLarge)
-                        val accents = listOf(0xFFD97757L, 0xFF7B9ACAL, 0xFF8B78C9L, 0xFF5FAF91L, 0xFFE5A548L, 0xFFCF778DL)
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            accents.forEach { color ->
-                                val selected = prefs.themeColor == color
-                                Surface(onClick = { model.setThemeColor(color) }, shape = RoundedCornerShape(50),
-                                    color = Color(color.toInt()), border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface) else null,
-                                    modifier = Modifier.size(if (selected) 38.dp else 34.dp).testTag("theme-color-" + color)) {}
-                            }
-                        }
-                        var customHex by remember(prefs.themeColor) { mutableStateOf("%06X".format(prefs.themeColor and 0xFFFFFF)) }
-                        OutlinedTextField(value = customHex, onValueChange = { input ->
-                            if (input.length <= 6 && input.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }) {
-                                customHex = input
-                                if (input.length == 6) input.toLongOrNull(16)?.let { model.setThemeColor(0xFF000000L or it) }
-                            }
-                        }, label = { Text(tr("自定义 HEX（实时预览）", "Custom HEX · live preview")) },
-                            prefix = { Text("#") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        Text("${tr("字幕字号", "Subtitle size")} · ${(font * 100).toInt()}%", style = MaterialTheme.typography.labelLarge)
-                        Slider(font, { font = it }, valueRange = .85f..1.5f, steps = 12,
-                            onValueChangeFinished = { model.setSubtitleFontScale(font) }, modifier = Modifier.testTag("subtitle-size"))
-                    }
-                }
-                item {
-                    SettingsSection(tr("更新与关于", "Updates & about"), Icons.Outlined.SystemUpdate) {
-                        Text("Open Listener  v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.titleMedium)
-                        Row(Modifier.fillMaxWidth().testTag("update-actions"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = model::checkUpdates, enabled = !updates.checking && !updates.downloading,
-                                modifier = Modifier.weight(1f).testTag("check-updates"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text(if (updates.checking) tr("检查中…", "Checking…") else tr("检查更新", "Check updates"), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) }
-                            OutlinedButton(onClick = model::downloadUpdate, enabled = updates.update != null && !updates.downloading && !updates.checking && editingAllowed && updates.file == null,
-                                modifier = Modifier.weight(1f).testTag("download-update"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text(tr("下载更新", "Download"), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) }
-                        }
-                        when {
-                            updates.checking -> LinearProgressIndicator(Modifier.fillMaxWidth())
-                            updates.error != null -> ErrorText(updates.error.orEmpty())
-                            updates.checked && updates.update == null -> Text(tr("已是最新版本。", "You're up to date."), style = MaterialTheme.typography.bodyMedium)
-                            updates.update != null -> {
-                                Text("${tr("可用版本", "Available")}: ${updates.update?.versionName}", style = MaterialTheme.typography.labelLarge)
-                                updates.update?.let { update ->
-                                    Hint("${tr("自动匹配安装包", "Matched APK")}: ${update.abi} · ${bytes(update.apk.size)}")
-                                }
-                                updates.update?.notes?.takeIf { it.isNotBlank() }?.let { notes -> Text(notes, style = MaterialTheme.typography.bodySmall) }
-                            }
-                        }
-                        if (updates.downloading) {
-                            val total = updates.total
-                            if (total != null && total > 0) LinearProgressIndicator(progress = { (updates.received.toFloat() / total).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-                            else LinearProgressIndicator(Modifier.fillMaxWidth())
-                            Hint("${bytes(updates.received)} / ${total?.let(::bytes) ?: "—"}")
-                            TextButton(onClick = model::cancelUpdateDownload) { Text(tr("取消下载", "Cancel download")) }
-                        }
-                        if (updates.file != null) {
-                            Button(onClick = model::installUpdate, enabled = editingAllowed, modifier = Modifier.testTag("install-update")) { Text(tr("交给系统安装", "Install with Android")) }
-                        }
-                        if (!editingAllowed) Hint(tr("结束聆听后可更新", "Finish listening to update"))
-                        TextButton(onClick = { model.openUrl("https://github.com/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPOSITORY}") }) { Text("Github") }
-                    }
-                }
-            } else when (page) {
-                "asr-local" -> {
-                    model.modelCatalog.forEach { manifest ->
-                        item(key = "model-${manifest.id}") {
+                        item {
                             ReadingSurface {
-                                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    val status = modelStates[manifest.id]
-                                    val phase = status?.phase ?: ModelPhase.NOT_INSTALLED
-                                    var more by remember { mutableStateOf(false) }
-                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                        Column(Modifier.weight(1f)) {
-                                            Text(manifest.displayName.replace(" (INT8)", ""), style = MaterialTheme.typography.titleSmall)
-                                            Text("${bytes(manifest.bytes)} · ${phaseLabel(phase)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Column(Modifier.fillMaxWidth()) {
+                                    CompactSettingRow(tr("语音识别", "Speech recognition"), Icons.Outlined.Mic, "asr-settings",
+                                        onClick = { page = if (prefs.asrProvider == "local") "asr-local" else "asr-cloud" })
+                                    HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f))
+                                    CompactSettingRow(tr("文字翻译", "Translation"), Icons.Outlined.Translate, "translation-settings",
+                                        onClick = { page = if (prefs.asrProvider == "doubao_ast") "translation-integrated" else if (prefs.translationProvider == "mlkit") "translation-local" else "translation-cloud" })
+                                    HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f))
+                                    Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Outlined.GraphicEq, null, Modifier.size(21.dp), tint = MaterialTheme.colorScheme.primary)
+                                        Text(tr("语音保存", "Keep recordings"), Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.titleMedium)
+                                        Switch(prefs.retainAudio, model::setRetainAudio, enabled = editingAllowed, modifier = Modifier.testTag("retain-audio"))
+                                    }
+                                }
+                            }
+                        }
+                        item {
+                            SettingsSection(tr("外观", "Appearance"), Icons.Outlined.WbSunny) {
+                                InlineToggle(tr("主题", "Theme"), "light" to tr("浅色", "Light"), "dark" to tr("深色", "Dark"),
+                                    if (LocalDarkAppearance.current) "dark" else "light", model::setTheme)
+                                InlineToggle(tr("界面语言", "App language"), "zh" to "中文", "en" to "English",
+                                    if (LocalChinese.current) "zh" else "en", model::setLanguage)
+                                Text(tr("主题颜色", "Accent color"), style = MaterialTheme.typography.labelLarge)
+                                val accents = listOf(0xFFD97757L, 0xFF7B9ACAL, 0xFF8B78C9L, 0xFF5FAF91L, 0xFFE5A548L)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    accents.forEach { color ->
+                                        val selected = prefs.themeColor == color
+                                        Surface(onClick = { model.setThemeColor(color) }, shape = RoundedCornerShape(50),
+                                            color = Color(color.toInt()), border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface) else null,
+                                            modifier = Modifier.size(if (selected) 38.dp else 34.dp).testTag("theme-color-" + color)) {}
+                                    }
+                                    Box(Modifier.size(38.dp).clip(RoundedCornerShape(50))
+                                        .background(Brush.sweepGradient(listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red)))
+                                        .clickable { showColorPicker = true }.testTag("theme-color-custom"), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Outlined.Palette, tr("自定义颜色", "Custom color"), Modifier.size(21.dp), tint = Color.White)
+                                    }
+                                }
+                                Text("${tr("字幕字号", "Subtitle size")} · ${(font * 100).toInt()}%", style = MaterialTheme.typography.labelLarge)
+                                Slider(font, { font = it }, valueRange = .85f..1.5f, steps = 12,
+                                    onValueChangeFinished = { model.setSubtitleFontScale(font) }, modifier = Modifier.testTag("subtitle-size"))
+                            }
+                        }
+                        item {
+                            SettingsSection(tr("更新与关于", "Updates & about"), Icons.Outlined.SystemUpdate) {
+                                Text("Open Listener  v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.titleMedium)
+                                Row(Modifier.fillMaxWidth().testTag("update-actions"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick = model::checkUpdates, enabled = !updates.checking && !updates.downloading,
+                                        modifier = Modifier.weight(1f).testTag("check-updates"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text(if (updates.checking) tr("检查中…", "Checking…") else tr("检查更新", "Check updates"), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) }
+                                    OutlinedButton(onClick = model::downloadUpdate, enabled = updates.update != null && !updates.downloading && !updates.checking && editingAllowed && updates.file == null,
+                                        modifier = Modifier.weight(1f).testTag("download-update"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text(tr("下载更新", "Download"), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) }
+                                }
+                                when {
+                                    updates.checking -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                                    updates.error != null -> ErrorText(updates.error.orEmpty())
+                                    updates.checked && updates.update == null -> Text(tr("已是最新版本。", "You're up to date."), style = MaterialTheme.typography.bodyMedium)
+                                    updates.update != null -> {
+                                        Text("${tr("可用版本", "Available")}: ${updates.update?.versionName}", style = MaterialTheme.typography.labelLarge)
+                                        updates.update?.let { update ->
+                                            Hint("${tr("自动匹配安装包", "Matched APK")}: ${update.abi} · ${bytes(update.apk.size)}")
                                         }
-                                        if (phase == ModelPhase.INSTALLED) {
-                                            IconButton(onClick = { model.setLocalAsrModel(manifest.id) }, enabled = editingAllowed,
-                                                modifier = Modifier.testTag("select-model-${manifest.id}")) {
-                                                Icon(if (prefs.localAsrModel == manifest.id) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
-                                                    tr("选择模型", "Select model"), tint = MaterialTheme.colorScheme.primary)
+                                        updates.update?.notes?.takeIf { it.isNotBlank() }?.let { notes -> Text(notes, style = MaterialTheme.typography.bodySmall) }
+                                    }
+                                }
+                                if (updates.downloading) {
+                                    val total = updates.total
+                                    if (total != null && total > 0) LinearProgressIndicator(progress = { (updates.received.toFloat() / total).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+                                    else LinearProgressIndicator(Modifier.fillMaxWidth())
+                                    Hint("${bytes(updates.received)} / ${total?.let(::bytes) ?: "—"}")
+                                    TextButton(onClick = model::cancelUpdateDownload) { Text(tr("取消下载", "Cancel download")) }
+                                }
+                                if (updates.file != null) {
+                                    Button(onClick = model::installUpdate, enabled = editingAllowed, modifier = Modifier.testTag("install-update")) { Text(tr("交给系统安装", "Install with Android")) }
+                                }
+                                if (!editingAllowed) Hint(tr("结束聆听后可更新", "Finish listening to update"))
+                                TextButton(onClick = { model.openUrl("https://github.com/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPOSITORY}") }) { Text("Github") }
+                            }
+                        }
+                    } else when (page) {
+                        "asr-local" -> {
+                            model.modelCatalog.forEach { manifest ->
+                                item(key = "model-${manifest.id}") {
+                                    ReadingSurface {
+                                        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            val status = modelStates[manifest.id]
+                                            val phase = status?.phase ?: ModelPhase.NOT_INSTALLED
+                                            var more by remember { mutableStateOf(false) }
+                                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                                Column(Modifier.weight(1f)) {
+                                                    Text(manifest.displayName.replace(" (INT8)", ""), style = MaterialTheme.typography.titleSmall)
+                                                    Text("${bytes(manifest.bytes)} · ${phaseLabel(phase)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                                if (phase == ModelPhase.INSTALLED) {
+                                                    IconButton(onClick = { model.setLocalAsrModel(manifest.id) }, enabled = editingAllowed,
+                                                        modifier = Modifier.testTag("select-model-${manifest.id}")) {
+                                                        Icon(if (prefs.localAsrModel == manifest.id) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+                                                            tr("选择模型", "Select model"), tint = MaterialTheme.colorScheme.primary)
+                                                    }
+                                                } else if (phase in listOf(ModelPhase.NOT_INSTALLED, ModelPhase.ERROR)) {
+                                                    IconButton(onClick = { model.downloadModel(manifest.id) }, enabled = editingAllowed,
+                                                        modifier = Modifier.testTag("download-asr-model-${manifest.id}")) {
+                                                        Icon(Icons.Outlined.Download, tr("下载模型", "Download model"), tint = MaterialTheme.colorScheme.primary)
+                                                    }
+                                                }
+                                                Box {
+                                                    IconButton(onClick = { more = true }) { Icon(Icons.Outlined.MoreHoriz, tr("模型选项", "Model options")) }
+                                                    DropdownMenu(more, { more = false }) {
+                                                        DropdownMenuItem(text = { Text(tr("来源", "Source")) }, onClick = { more = false; model.openUrl(manifest.sourceUrl) })
+                                                        DropdownMenuItem(text = { Text(tr("许可证", "License")) }, onClick = { more = false; model.openUrl(manifest.licenseUrl) })
+                                                        if (phase == ModelPhase.INSTALLED) DropdownMenuItem(text = { Text(tr("删除模型", "Delete model")) },
+                                                            enabled = editingAllowed && status?.inUse != true, onClick = { more = false; deleteModel = manifest.id })
+                                                    }
+                                                }
                                             }
-                                        } else if (phase in listOf(ModelPhase.NOT_INSTALLED, ModelPhase.ERROR)) {
-                                            IconButton(onClick = { model.downloadModel(manifest.id) }, enabled = editingAllowed,
-                                                modifier = Modifier.testTag("download-asr-model-${manifest.id}")) {
-                                                Icon(Icons.Outlined.Download, tr("下载模型", "Download model"), tint = MaterialTheme.colorScheme.primary)
-                                            }
-                                        }
-                                        Box {
-                                            IconButton(onClick = { more = true }) { Icon(Icons.Outlined.MoreHoriz, tr("模型选项", "Model options")) }
-                                            DropdownMenu(more, { more = false }) {
-                                                DropdownMenuItem(text = { Text(tr("来源", "Source")) }, onClick = { more = false; model.openUrl(manifest.sourceUrl) })
-                                                DropdownMenuItem(text = { Text(tr("许可证", "License")) }, onClick = { more = false; model.openUrl(manifest.licenseUrl) })
-                                                if (phase == ModelPhase.INSTALLED) DropdownMenuItem(text = { Text(tr("删除模型", "Delete model")) },
-                                                    enabled = editingAllowed && status?.inUse != true, onClick = { more = false; deleteModel = manifest.id })
-                                            }
+                                            if (phase == ModelPhase.DOWNLOADING) {
+                                                val downloaded = status?.downloadedBytes ?: 0
+                                                val total = status?.totalBytes ?: manifest.bytes
+                                                LinearProgressIndicator(progress = { if (total > 0) (downloaded.toFloat() / total).coerceIn(0f, 1f) else 0f }, modifier = Modifier.fillMaxWidth())
+                                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                                    Text("${bytes(downloaded)} / ${bytes(total)}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                                                    TextButton(onClick = { model.cancelModelDownload(manifest.id) }) { Text(tr("取消", "Cancel")) }
+                                                }
+                                            } else if (phase in listOf(ModelPhase.VERIFYING, ModelPhase.EXTRACTING, ModelPhase.VALIDATING)) LinearProgressIndicator(Modifier.fillMaxWidth())
+                                            status?.error?.let { ErrorText(it) }
                                         }
                                     }
-                                    if (phase == ModelPhase.DOWNLOADING) {
-                                        val downloaded = status?.downloadedBytes ?: 0
-                                        val total = status?.totalBytes ?: manifest.bytes
-                                        LinearProgressIndicator(progress = { if (total > 0) (downloaded.toFloat() / total).coerceIn(0f, 1f) else 0f }, modifier = Modifier.fillMaxWidth())
-                                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                            Text("${bytes(downloaded)} / ${bytes(total)}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                                            TextButton(onClick = { model.cancelModelDownload(manifest.id) }) { Text(tr("取消", "Cancel")) }
+                                }
+                            }
+                            item {
+                                OutlinedButton(onClick = model::checkSelectedEngines, enabled = !check.busy) {
+                                    Text(if (check.busy) tr("检查中…", "Checking…") else tr("检查配置", "Check setup"))
+                                }
+                                check.detail?.let { Hint(it) }
+                            }
+                        }
+                        "asr-cloud" -> item {
+                            SettingsSection(tr("服务商", "Provider"), Icons.Outlined.Cloud) {
+                                SettingChoice(tr("模型服务", "Model service"), listOf("doubao" to tr("豆包", "Doubao"),
+                                    "doubao_ast" to tr("豆包同传", "Doubao AST"), "qwen" to tr("阿里云", "Aliyun"), "openai" to "OpenAI", "custom" to tr("自定义", "Custom")),
+                                    prefs.asrProvider, enabled = editingAllowed) { model.setProviders(it, prefs.translationProvider) }
+                                val provider = if (prefs.asrProvider in setOf("doubao", "doubao_ast")) prefs.asrProvider else "asr_${prefs.asrProvider}"
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick = { credentialsFor = provider }, enabled = editingAllowed, modifier = Modifier.testTag("asr-credentials")) {
+                                        Text(tr("配置 API", "Configure API"))
+                                    }
+                                    ApiHelpButton("asr-api-help") { guideFor = provider }
+                                }
+                                Hint(if (prefs.asrProvider == "doubao_ast") tr("同传 2.0 · 直接生成原文与译文字幕，不播报译音。", "AST 2.0 · Original and translated subtitles, without spoken output.")
+                                    else tr("豆包为实时识别；其他服务按短音频分段识别。模型 ID 可自由填写，需支持所选接口。", "Doubao streams live; other providers transcribe short audio chunks. Enter any model ID supported by the selected API."))
+                                OutlinedButton(onClick = model::checkSelectedEngines, enabled = !check.busy) {
+                                    Text(if (check.busy) tr("检查中…", "Checking…") else tr("检查配置", "Check setup"))
+                                }
+                                check.detail?.let { Hint(it) }
+                            }
+                        }
+                        "translation-integrated" -> item {
+                            SettingsSection(tr("豆包同声传译", "Doubao simultaneous translation"), Icons.Outlined.Translate) {
+                                Text(tr("原文与译文由同传模型直接生成。", "The simultaneous model generates both original and translated subtitles."), style = MaterialTheme.typography.bodyMedium)
+                                Hint(tr("仅输出文字。源语言与目标语言可在设置首页修改。", "Text output only. Choose spoken and target languages on the settings overview."))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    OutlinedButton(onClick = { credentialsFor = "doubao_ast" }, enabled = editingAllowed) { Text(tr("配置 API", "Configure API")) }
+                                    ApiHelpButton("ast-translation-help") { guideFor = "doubao_ast" }
+                                }
+                            }
+                        }
+                        "translation-local" -> item {
+                            SettingsSection("Google ML Kit", Icons.Outlined.Translate) {
+                                OutlinedButton(onClick = model::downloadLanguageModels, enabled = !languageBusy && editingAllowed,
+                                    modifier = Modifier.testTag("download-language-models")) { Text(if (languageBusy) tr("处理中…", "Working…") else tr("下载所选语言包", "Download selected languages")) }
+                                if (languageBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                                if (installed.isEmpty()) Hint(tr("尚未下载语言包", "No language models downloaded"))
+                                installed.sorted().forEach { language ->
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                        Text("${languageName(language)} · ${tr("已安装", "Installed")}", modifier = Modifier.weight(1f))
+                                        IconButton(onClick = { deleteLanguage = language }, enabled = !languageBusy && editingAllowed) {
+                                            Icon(Icons.Outlined.DeleteOutline, "${tr("删除语言包", "Delete language model")} $language")
                                         }
-                                    } else if (phase in listOf(ModelPhase.VERIFYING, ModelPhase.EXTRACTING, ModelPhase.VALIDATING)) LinearProgressIndicator(Modifier.fillMaxWidth())
-                                    status?.error?.let { ErrorText(it) }
+                                    }
+                                }
+                                TextButton(onClick = model::refreshLanguageModels, enabled = !languageBusy) { Text(tr("刷新已安装语言", "Refresh installed languages")) }
+                            }
+                        }
+                        "translation-cloud" -> item {
+                            SettingsSection(tr("服务商", "Provider"), Icons.Outlined.Cloud) {
+                                SettingChoice(tr("模型服务", "Model service"), listOf(
+                                    "doubao" to tr("豆包", "Doubao"), "qwen" to tr("阿里云", "Aliyun"),
+                                    "openai" to "OpenAI", "custom" to tr("自定义", "Custom")),
+                                    prefs.translationProvider, enabled = editingAllowed) { model.setProviders(prefs.asrProvider, it) }
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick = { credentialsFor = "translation_${prefs.translationProvider}" },
+                                        enabled = editingAllowed, modifier = Modifier.testTag("translation-credentials")) { Text(tr("配置 API", "Configure API")) }
+                                    ApiHelpButton("translation-api-help") { guideFor = "translation_${prefs.translationProvider}" }
                                 }
                             }
-                        }
-                    }
-                    item {
-                        OutlinedButton(onClick = model::checkSelectedEngines, enabled = !check.busy) {
-                            Text(if (check.busy) tr("检查中…", "Checking…") else tr("检查配置", "Check setup"))
-                        }
-                        check.detail?.let { Hint(it) }
-                    }
-                }
-                "asr-cloud" -> item {
-                    SettingsSection(tr("服务商", "Provider"), Icons.Outlined.Cloud) {
-                        SettingChoice(tr("模型服务", "Model service"), listOf("doubao" to tr("豆包", "Doubao"),
-                            "doubao_ast" to tr("豆包同传", "Doubao AST"), "qwen" to tr("阿里云", "Aliyun"), "openai" to "OpenAI", "custom" to tr("自定义", "Custom")),
-                            prefs.asrProvider, enabled = editingAllowed) { model.setProviders(it, prefs.translationProvider) }
-                        val provider = if (prefs.asrProvider in setOf("doubao", "doubao_ast")) prefs.asrProvider else "asr_${prefs.asrProvider}"
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { credentialsFor = provider }, enabled = editingAllowed, modifier = Modifier.testTag("asr-credentials")) {
-                                Text(tr("配置 API", "Configure API"))
-                            }
-                            ApiHelpButton("asr-api-help") { guideFor = provider }
-                        }
-                        Hint(if (prefs.asrProvider == "doubao_ast") tr("同传 2.0 · 直接生成原文与译文字幕，不播报译音。", "AST 2.0 · Original and translated subtitles, without spoken output.")
-                            else tr("豆包为实时识别；其他服务按短音频分段识别。模型 ID 可自由填写，需支持所选接口。", "Doubao streams live; other providers transcribe short audio chunks. Enter any model ID supported by the selected API."))
-                        OutlinedButton(onClick = model::checkSelectedEngines, enabled = !check.busy) {
-                            Text(if (check.busy) tr("检查中…", "Checking…") else tr("检查配置", "Check setup"))
-                        }
-                        check.detail?.let { Hint(it) }
-                    }
-                }
-                "translation-integrated" -> item {
-                    SettingsSection(tr("豆包同声传译", "Doubao simultaneous translation"), Icons.Outlined.Translate) {
-                        Text(tr("原文与译文由同传模型直接生成。", "The simultaneous model generates both original and translated subtitles."), style = MaterialTheme.typography.bodyMedium)
-                        Hint(tr("仅输出文字。源语言与目标语言可在设置首页修改。", "Text output only. Choose spoken and target languages on the settings overview."))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            OutlinedButton(onClick = { credentialsFor = "doubao_ast" }, enabled = editingAllowed) { Text(tr("配置 API", "Configure API")) }
-                            ApiHelpButton("ast-translation-help") { guideFor = "doubao_ast" }
-                        }
-                    }
-                }
-                "translation-local" -> item {
-                    SettingsSection("Google ML Kit", Icons.Outlined.Translate) {
-                        OutlinedButton(onClick = model::downloadLanguageModels, enabled = !languageBusy && editingAllowed,
-                            modifier = Modifier.testTag("download-language-models")) { Text(if (languageBusy) tr("处理中…", "Working…") else tr("下载所选语言包", "Download selected languages")) }
-                        if (languageBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                        if (installed.isEmpty()) Hint(tr("尚未下载语言包", "No language models downloaded"))
-                        installed.sorted().forEach { language ->
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Text("${languageName(language)} · ${tr("已安装", "Installed")}", modifier = Modifier.weight(1f))
-                                IconButton(onClick = { deleteLanguage = language }, enabled = !languageBusy && editingAllowed) {
-                                    Icon(Icons.Outlined.DeleteOutline, "${tr("删除语言包", "Delete language model")} $language")
-                                }
-                            }
-                        }
-                        TextButton(onClick = model::refreshLanguageModels, enabled = !languageBusy) { Text(tr("刷新已安装语言", "Refresh installed languages")) }
-                    }
-                }
-                "translation-cloud" -> item {
-                    SettingsSection(tr("服务商", "Provider"), Icons.Outlined.Cloud) {
-                        SettingChoice(tr("模型服务", "Model service"), listOf(
-                            "doubao" to tr("豆包", "Doubao"), "qwen" to tr("阿里云", "Aliyun"),
-                            "openai" to "OpenAI", "custom" to tr("自定义", "Custom")),
-                            prefs.translationProvider, enabled = editingAllowed) { model.setProviders(prefs.asrProvider, it) }
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { credentialsFor = "translation_${prefs.translationProvider}" },
-                                enabled = editingAllowed, modifier = Modifier.testTag("translation-credentials")) { Text(tr("配置 API", "Configure API")) }
-                            ApiHelpButton("translation-api-help") { guideFor = "translation_${prefs.translationProvider}" }
                         }
                     }
                 }
             }
         }
     }
+    if (showColorPicker) ThemeColorPicker(prefs.themeColor,
+        onDismiss = { showColorPicker = false },
+        onConfirm = { model.setThemeColor(it); showColorPicker = false })
     credentialsFor?.let { provider -> CredentialsDialog(provider, model, editingAllowed,
         onHelp = { guideFor = provider }, onDismiss = { credentialsFor = null }) }
     guideFor?.let { provider ->
@@ -429,19 +443,24 @@ private fun InlineToggle(title: String, first: Pair<String, String>, second: Pai
 
 @Composable
 private fun ModelCategories(local: Boolean, enabled: Boolean, tag: String, onLocal: () -> Unit, onCloud: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
-        listOf(true to tr("本地模型", "Local models"), false to tr("云端模型", "Cloud models")).forEach { (isLocal, label) ->
-            val selected = local == isLocal
-            val selectedColor by animateColorAsState(
-                if (selected) MaterialTheme.colorScheme.surface.copy(alpha = .20f) else Color.Transparent,
-                animationSpec = tween(260), label = "model-tab")
-            val shape = if (isLocal) RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp) else RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
-            Box(Modifier.weight(1f).height(56.dp).clip(shape).background(selectedColor)
-                .clickable(enabled = enabled) { if (isLocal) onLocal() else onCloud() }
-                .testTag("$tag-" + if (isLocal) "local-models" else "cloud-models"),
-                contentAlignment = Alignment.Center) {
-                Text(label, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.titleMedium)
+    // Only the panel exterior is rounded; tabs and content meet on square edges.
+    BoxWithConstraints(Modifier.fillMaxWidth().height(56.dp)) {
+        val tabWidth = maxWidth / 2
+        val offset by animateDpAsState(if (local) 0.dp else tabWidth,
+            animationSpec = tween(260), label = "model-selection-slide")
+        Box(Modifier.offset(x = offset).width(tabWidth).fillMaxHeight()
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = .18f)))
+        Row(Modifier.fillMaxSize()) {
+            listOf(true to tr("本地模型", "Local models"), false to tr("云端模型", "Cloud models")).forEach { (isLocal, label) ->
+                val selected = local == isLocal
+                Box(Modifier.weight(1f).fillMaxHeight()
+                    .selectable(selected = selected, enabled = enabled, role = Role.Tab,
+                        onClick = { if (isLocal) onLocal() else onCloud() })
+                    .testTag("$tag-" + if (isLocal) "local-models" else "cloud-models"),
+                    contentAlignment = Alignment.Center) {
+                    Text(label, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.titleMedium)
+                }
             }
         }
     }

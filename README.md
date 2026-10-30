@@ -10,7 +10,7 @@ Native Android · live bilingual text · optional audio retention
 
 [中文说明](README.zh-CN.md) · [Build](#build) · [Privacy](PRIVACY.md) · [License](LICENSE)
 
-**[Download v0.1.8](https://github.com/vexpaer/open-listener/releases/tag/v0.1.8) · ARM64 and Universal APKs**
+**[Download v0.1.9](https://github.com/vexpaer/open-listener/releases/tag/v0.1.9) · ARM64 and Universal APKs**
 
 </div>
 
@@ -20,8 +20,8 @@ Open Listener is a text-first Android companion for lectures, classes and semina
 
 ## What it does
 
-- **Make it yours:** choose any HEX accent color (Claude-inspired orange by default), preview the coordinated OKLCH background and animated glow instantly, and switch between light and dark appearances. Your choice stays on your device.
-- **Refined navigation:** translucent glass panels, accent-colored live audio bars and navigation selection, comfortable swipe spacing, and connected local/cloud model selectors.
+- **Make it yours:** choose a preset accent or tap the rainbow circle for a color wheel and brightness control (warm orange by default), enjoy a coordinated OKLCH background and animated glow, and switch between light and dark appearances. Your choice stays on your device.
+- **Refined navigation:** translucent glass panels, accent-colored live audio bars and navigation selection, comfortable swipe spacing, and local/cloud model panels with square joining edges with a sliding selection. Ambient movement now runs at twice the previous speed.
 
 
 - **Listen:** swipe between three top tabs, bilingual live text, partial/final distinction, pause/resume/stop notification actions.
@@ -62,7 +62,7 @@ The command is for a machine that already has the Android toolchain; the hosted 
 
 ## Development status
 
-The current version is `0.1.8`. Release downloads include a Universal APK and a smaller ARM64 APK; the in-app updater selects the compatible asset automatically. A provider is shown as ready only after its model or credentials pass the local availability check. Real provider credentials are intentionally not included in CI; protocol tests use anonymized fixtures and mock servers. See [`CHANGELOG.md`](CHANGELOG.md) and [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
+The current version is `0.1.9`. Release downloads include a Universal APK and a smaller ARM64 APK; the in-app updater selects the compatible asset automatically. A provider is shown as ready only after its model or credentials pass the local availability check. Real provider credentials are intentionally not included in CI; protocol tests use anonymized fixtures and mock servers. See [`CHANGELOG.md`](CHANGELOG.md) and [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
 ## License
 
