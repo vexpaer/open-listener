@@ -14,6 +14,10 @@ import io.github.vexpaer.openlistener.data.AppPreferences
 import io.github.vexpaer.openlistener.data.SegmentEntity
 import io.github.vexpaer.openlistener.data.SessionEntity
 import io.github.vexpaer.openlistener.export.TranscriptExporter
+import io.github.vexpaer.openlistener.export.TranscriptArchive
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import io.github.vexpaer.openlistener.translation.MlKitTranslation
 import io.github.vexpaer.openlistener.service.MicrophoneRecognitionService
 import io.github.vexpaer.openlistener.service.RecognitionRuntime
@@ -349,6 +353,43 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
             block(session, repository.listSegments(id))
         } catch (error: Exception) { showError(error) }
     }
+    private val _exportingArchive = MutableStateFlow(false)
+    val exportingArchive = _exportingArchive.asStateFlow()
+
+    fun exportAllZip() {
+        if (_exportingArchive.value) return
+        _exportingArchive.value = true
+        viewModelScope.launch {
+            var temporary: File? = null
+            try {
+                val file = withContext(Dispatchers.IO) {
+                    val all = repository.observeSessions().first()
+                    check(all.isNotEmpty()) { text("暂无可导出的记录。", "No records to export.") }
+                    cleanShareCache()
+                    val directory = File(app.cacheDir, "exports").apply { check(exists() || mkdirs()) }
+                    val target = File(directory, "OpenListener-records-${System.currentTimeMillis()}.zip")
+                    val pending = File(directory, target.name + ".partial").also { temporary = it }
+                    val records = all.map { TranscriptArchive.Record(it, repository.listSegments(it.id)) }
+                    val context = currentCoroutineContext()
+                    TranscriptArchive.write(records, pending.outputStream()) { context.ensureActive() }
+                    check(pending.renameTo(target)) { "Unable to finalize ZIP archive" }
+                    temporary = null
+                    target
+                }
+                val uri = FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", file)
+                val send = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/zip"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    clipData = ClipData.newRawUri("Open Listener archive", uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                effectChannel.send(UiEffect.StartActivity(Intent.createChooser(send, text("导出全部记录", "Export all records"))))
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { notify("导出失败：${error.message}", "Export failed: ${error.message}") }
+            finally { temporary?.delete(); _exportingArchive.value = false }
+        }
+    }
+
     private fun cleanShareCache() {
         val threshold = System.currentTimeMillis() - SHARE_TTL
         File(app.cacheDir, "exports").listFiles()?.filter { it.isFile && it.lastModified() < threshold }?.forEach { it.delete() }

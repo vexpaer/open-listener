@@ -6,19 +6,21 @@
 
 [English](README.md) · [构建](#构建) · [隐私](PRIVACY.md)
 
-> **[下载 v0.1.9](https://github.com/vexpaer/open-listener/releases/tag/v0.1.9)** · ARM64 / Universal APK；支持应用内更新。
+> **[下载 v0.1.10](https://github.com/vexpaer/open-listener/releases/tag/v0.1.10)** · ARM64 / Universal APK；支持应用内更新。
 
 Open Listener 面向课程、讲座和研讨会。打开应用后在可见页面点击一次，实时阅读原文与译文，并将已经确认的文字保存为可搜索记录。“保留录音”默认关闭，开启后可将新会话录音保存在本机。
 
 <div align="center">
-<img src="app/src/main/res/drawable/ic_launcher.png" width="76" alt="Open Listener 胡萝卜图标" />
+<img src="docs/images/mark.svg" width="76" alt="Open Listener 胡萝卜图标" />
 </div>
 
 ## 功能
 
-背景运动速度提高一倍；本地 / 云端模型的连接处改用直角贴合，并使用滑动选中底色，记录分享改用线框上传图标。
+记录页右下角支持将全部文字记录和保留的录音导出为 ZIP；本地识别新增 English GigaSpeech 模型。开始按钮的三角形与暂停图形动态变形，移除准备阶段进度条。
 
-- **主题色自定义：** 默认 Claude 风格橙色，可选择预设颜色，或点击彩色圆打开选色盘并调节亮度；使用 OKLCH 自动生成协调的三色背景，动态光晕与深浅模式同步适配，并在本地保存。
+背景周期缩短至 40 秒；设置面板不透明度为 30%；本地 / 云端模型的连接处改用直角贴合，并使用滑动选中底色，记录分享改用线框上传图标。
+
+- **主题色自定义：** 默认恢复原来的蓝色，可选择预设颜色，或点击彩色圆打开选色盘并调节亮度；使用 OKLCH 自动生成协调的三色背景，动态光晕与深浅模式同步适配，并在本地保存。
 - **交互优化：** 20% 不透明度的半透明面板、随主题色变化的音量柱与选中态、留有间距的页面滑动，以及与内容面板连贯的本地／云端模型切换。
 
 

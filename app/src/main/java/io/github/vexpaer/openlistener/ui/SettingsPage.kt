@@ -68,10 +68,10 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
             }
         }
         val connectedPanel = page != null && page != "translation-integrated"
-        CompositionLocalProvider(LocalConnectedModelPanel provides connectedPanel) {
+        CompositionLocalProvider(LocalConnectedModelPanel provides connectedPanel, LocalReadingSurfaceAlpha provides .30f) {
             Column(Modifier.weight(1f).fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
-                .background(if (connectedPanel) MaterialTheme.colorScheme.surface.copy(alpha = .20f) else Color.Transparent)) {
+                .background(if (connectedPanel) MaterialTheme.colorScheme.surface.copy(alpha = .30f) else Color.Transparent)) {
                 page?.let { current ->
                     if (current != "translation-integrated") {
                     val speech = current.startsWith("asr")
@@ -121,7 +121,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                                 InlineToggle(tr("界面语言", "App language"), "zh" to "中文", "en" to "English",
                                     if (LocalChinese.current) "zh" else "en", model::setLanguage)
                                 Text(tr("主题颜色", "Accent color"), style = MaterialTheme.typography.labelLarge)
-                                val accents = listOf(0xFFD97757L, 0xFF7B9ACAL, 0xFF8B78C9L, 0xFF5FAF91L, 0xFFE5A548L)
+                                val accents = listOf(0xFFD97757L, 0xFF406B88L, 0xFF8B78C9L, 0xFF5FAF91L, 0xFFE5A548L)
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     accents.forEach { color ->
                                         val selected = prefs.themeColor == color
@@ -428,7 +428,7 @@ private fun InlineToggle(title: String, first: Pair<String, String>, second: Pai
     Row(Modifier.fillMaxWidth().height(42.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(title, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
         Row(Modifier.width(196.dp).fillMaxHeight().clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = .20f))) {
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = .30f))) {
             listOf(first, second).forEach { (key, label) ->
                 val background by animateColorAsState(if (selected == key) MaterialTheme.colorScheme.primary.copy(alpha = .22f) else Color.Transparent,
                     animationSpec = tween(230), label = "settings-selection")
@@ -446,7 +446,7 @@ private fun ModelCategories(local: Boolean, enabled: Boolean, tag: String, onLoc
     // Only the panel exterior is rounded; tabs and content meet on square edges.
     BoxWithConstraints(Modifier.fillMaxWidth().height(56.dp)) {
         val tabWidth = maxWidth / 2
-        val offset by animateDpAsState(if (local) 0.dp else tabWidth,
+        val offset by animateDpAsState(if (local) tabWidth else 0.dp,
             animationSpec = tween(260), label = "model-selection-slide")
         Box(Modifier.offset(x = offset).width(tabWidth).fillMaxHeight()
             .background(MaterialTheme.colorScheme.primary.copy(alpha = .18f)))
@@ -458,7 +458,7 @@ private fun ModelCategories(local: Boolean, enabled: Boolean, tag: String, onLoc
                         onClick = { if (isLocal) onLocal() else onCloud() })
                     .testTag("$tag-" + if (isLocal) "local-models" else "cloud-models"),
                     contentAlignment = Alignment.Center) {
-                    Text(label, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    Text(label, color = if (selected) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.titleMedium)
                 }
             }

@@ -15,7 +15,7 @@ The app does not log PCM, transcript bodies, API keys or cloud response bodies.
 
 ## Text records
 
-Confirmed original and translated segments are stored in a local Room database until the user deletes them. Markdown/PDF export and Android sharing are initiated by the user. Shared documents are temporary text artifacts under the app's private cache and are cleaned after a TTL; a receiving app may retain a copy.
+Confirmed original and translated segments are stored in a local Room database until the user deletes them. Markdown/PDF export and Android sharing are initiated by the user. Single-record exports contain text. The Library export-all ZIP includes every transcript and any retained WAV recordings, including a bounded snapshot of an active recording. Exported files are temporary artifacts under the app's private cache and are cleaned after a TTL; a receiving app may retain a copy.
 
 ## Translation
 

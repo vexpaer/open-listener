@@ -17,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 val LocalDarkAppearance = staticCompositionLocalOf { false }
-val LocalThemeTones = staticCompositionLocalOf { listOf(Color(0xFFDFA58C), Color(0xFFD97757), Color(0xFFF4CFBD)) }
+val LocalThemeTones = staticCompositionLocalOf { listOf(Color(0xFFAACBE9), Color(0xFF85B2D8), Color(0xFFC5DFEE)) }
 
 /** OKLCH color harmonization with chroma clamped to the sRGB gamut. */
 private fun oklch(l: Double, c: Double, h: Double): Color {
@@ -38,6 +38,8 @@ private fun oklch(l: Double, c: Double, h: Double): Color {
         gamma(v[1]).coerceIn(0.0, 1.0).toFloat(), gamma(v[2]).coerceIn(0.0, 1.0).toFloat())
 }
 fun themeTones(argb: Long, dark: Boolean): List<Color> {
+    if (argb == 0xFF406B88L) return if (dark) listOf(Color(0xFF15253C), Color(0xFF243F5D), Color(0xFF101E33))
+        else listOf(Color(0xFFAACBE9), Color(0xFF85B2D8), Color(0xFFC5DFEE))
     val color = Color(argb.toInt())
     fun linear(v: Float) = if (v <= .04045f) v / 12.92 else ((v + .055) / 1.055).pow(2.4).toDouble()
     val r = linear(color.red); val g = linear(color.green); val b = linear(color.blue)

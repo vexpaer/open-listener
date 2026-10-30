@@ -67,6 +67,29 @@ object ModelCatalog {
                 ModelFile("encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx", 67963182, "ac01b68c61d1a716d90baea606b9683ddab07fbd097fc54398d19b027f390ef1"),
                 ModelFile("decoder-epoch-99-avg-1-chunk-16-left-128.onnx", 2093080, "85914f840b71110487ece7a30ebd0bd4b8fb5c2623215bba3aa5ab4c138fc591")
             )
+        ),
+        ModelManifest(
+            id = "zipformer-en-gigaspeech-2023-06-21-mobile",
+            displayName = "Zipformer · English GigaSpeech (INT8)",
+            version = "2023-06-21-mobile",
+            languages = setOf("en"), streaming = true,
+            license = "Apache-2.0",
+            licenseUrl = "https://huggingface.co/marcoyang/icefall-libri-giga-pruned-transducer-stateless7-streaming-2023-04-04",
+            sourceUrl = "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-transducer/zipformer-transducer-models.html",
+            url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-2023-06-21-mobile.tar.bz2",
+            bytes = 365_748_162,
+            sha256 = "b97e7ff75a27136f4dd33c99bb7d5f493094397501be4739578c6cd95ea7f422",
+            archiveRoot = "sherpa-onnx-streaming-zipformer-en-2023-06-21-mobile",
+            files = listOf(
+                ModelFile("joiner-epoch-99-avg-1.int8.onnx", 259335,
+                    "831477d390e59a61f1b6a6f763b9903e6c6366ff6034f1ddba613be82637122f"),
+                ModelFile("decoder-epoch-99-avg-1.onnx", 2092566,
+                    "9da02b77cb08826756ec6a88635f35a40374e4164e7c6359121a9145958a6ceb"),
+                ModelFile("tokens.txt", 5048,
+                    "49e3c2646595fd907228b3c6787069658f67b17377c60aeb8619c4551b2316fb"),
+                ModelFile("encoder-epoch-99-avg-1.int8.onnx", 111205459,
+                    "c0391141c0faf05142004b96dd5e66830a737386b00a5e638d0a228f051a7b60")
+            )
         )
     )
 }
