@@ -7,7 +7,7 @@
 - `INTERNET`: explicit model/runtime language downloads, public update check/download, or the user's selected cloud engines.
 - `REQUEST_INSTALL_PACKAGES`: requests Android's unknown-source authorization before handing a verified update APK to the system installer. No silent installation.
 
-No location, broad storage, contacts, boot receiver or accessibility-service permission is used. SAF grants a user-selected output document; FileProvider grants temporary access only to text export/update cache subdirectories.
+No location, broad storage, contacts, boot receiver or accessibility-service permission is used. SAF grants a user-selected output document; FileProvider grants temporary access only to export/update cache subdirectories (including user-requested ZIP archives with retained audio).
 
 A foreground service is not an exemption from Android/OEM policies. There is no auto-start microphone on boot, background resurrection or forced battery allowlist. Confirmed Room text survives process loss; unknown/lost audio cannot be restored.
 

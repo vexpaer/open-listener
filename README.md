@@ -21,12 +21,12 @@ Open Listener is a text-first Android companion for lectures, classes and semina
 ## What it does
 
 - **Make it yours:** choose a preset accent or tap the rainbow circle for a color wheel and brightness control (the original blue by default), enjoy a coordinated OKLCH background and animated glow, and switch between light and dark appearances. Your choice stays on your device.
-- **Refined navigation:** translucent glass panels, accent-colored live audio bars and navigation selection, comfortable swipe spacing, and local/cloud model panels with square joining edges with a sliding selection. Settings panels use 30% opacity. Ambient movement uses a 40-second cycle.
+- **Refined navigation:** translucent glass panels, accent-colored live audio bars and navigation selection, comfortable swipe spacing, and local/cloud model panels with square joining edges and a sliding selection. Settings panels use 30% opacity. Ambient movement uses a 40-second cycle.
 
 
 - **Listen:** swipe between three top tabs, bilingual live text, partial/final distinction, pause/resume/stop notification actions.
 - **Archive everything:** export all records and retained audio to one ZIP from the Library’s bottom-right button.
-- **Keep:** confirmed segments persist in Room; search, copy, rename, delete, Markdown/PDF export and Android sharing use text only.
+- **Keep:** confirmed segments persist in Room; search, copy, rename, delete, single-record Markdown/PDF exports contain text; ZIP archives also include retained audio.
 - **Choose the data path:** local sherpa-onnx streaming ASR (including an English GigaSpeech option) + on-device ML Kit translation, or BYOK cloud providers with disclosure.
 - **Update safely:** latest stable release metadata, SHA-256, package identity and signing certificate are checked before the Android installer is opened.
 
