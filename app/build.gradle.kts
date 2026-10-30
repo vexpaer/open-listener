@@ -14,8 +14,8 @@ android {
         applicationId = "io.github.vexpaer.openlistener"
         minSdk = 26
         targetSdk = 36
-        versionCode = 107
-        versionName = "0.1.7"
+        versionCode = 108
+        versionName = "0.1.8"
         testInstrumentationRunner = "io.github.vexpaer.openlistener.ListenerTestRunner"
         vectorDrawables { useSupportLibrary = true }
         val releaseAbi = providers.gradleProperty("releaseAbi").orElse("universal").get()

@@ -15,6 +15,7 @@ private val Context.settingsDataStore by preferencesDataStore(name = "settings")
 data class AppPreferences(
     val appLanguage: String = "system",
     val theme: String = "system",
+    val themeColor: Long = 0xFFD97757L,
     val reducedMotion: Boolean = false,
     val subtitleFontScale: Float = 1f,
     val sourceLanguage: String = "en",
@@ -29,6 +30,7 @@ class PreferencesStore(private val context: Context) {
     private object Keys {
         val appLanguage = stringPreferencesKey("app_language")
         val theme = stringPreferencesKey("theme")
+        val themeColor = stringPreferencesKey("theme_color")
         val reducedMotion = booleanPreferencesKey("reduced_motion")
         val subtitleFontScale = floatPreferencesKey("subtitle_font_scale")
         val sourceLanguage = stringPreferencesKey("source_language")
@@ -43,6 +45,7 @@ class PreferencesStore(private val context: Context) {
         AppPreferences(
             appLanguage = values[Keys.appLanguage] ?: "system",
             theme = values[Keys.theme] ?: "system",
+            themeColor = values[Keys.themeColor]?.toLongOrNull() ?: 0xFFD97757L,
             reducedMotion = values[Keys.reducedMotion] ?: false,
             subtitleFontScale = (values[Keys.subtitleFontScale] ?: 1f).coerceIn(.85f, 1.5f),
             sourceLanguage = values[Keys.sourceLanguage] ?: "en",
@@ -56,6 +59,7 @@ class PreferencesStore(private val context: Context) {
 
     suspend fun setRetainAudio(value: Boolean) = context.settingsDataStore.edit { it[Keys.retainAudio] = value }
     suspend fun setLocalAsrModel(value: String) = context.settingsDataStore.edit { it[Keys.localAsrModel] = value }
+    suspend fun setThemeColor(value: Long) = context.settingsDataStore.edit { it[Keys.themeColor] = value.toString() }
     suspend fun setTheme(value: String) = context.settingsDataStore.edit { it[Keys.theme] = value }
     suspend fun setReducedMotion(value: Boolean) = context.settingsDataStore.edit { it[Keys.reducedMotion] = value }
     suspend fun setLanguage(value: String) = context.settingsDataStore.edit { it[Keys.appLanguage] = value }

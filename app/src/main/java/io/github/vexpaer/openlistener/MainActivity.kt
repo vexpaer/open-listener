@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val preferences by model.preferences.collectAsState()
-            OpenListenerTheme(preferences.theme, preferences.reducedMotion) {
+            OpenListenerTheme(preferences.theme, preferences.reducedMotion, preferences.themeColor) {
                 OpenListenerRoot(viewModel = model, foreground = foreground)
             }
         }
