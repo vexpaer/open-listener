@@ -68,11 +68,7 @@ jobs:
           target: google_apis
           profile: pixel_6
           disable-animations: true
-          script: |
-            INSTRUMENTATION_EXIT=0
-            ./gradlew --no-daemon connectedDebugAndroidTest || INSTRUMENTATION_EXIT=$?
-            adb pull /sdcard/Download/openlistener-ui screenshots || true
-            exit "$INSTRUMENTATION_EXIT"
+          script: bash tools/run_instrumentation.sh
       - name: Upload emulator evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
