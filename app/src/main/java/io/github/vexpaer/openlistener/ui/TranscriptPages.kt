@@ -8,6 +8,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import io.github.vexpaer.openlistener.R
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -305,7 +307,7 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, tr("返回记录", "Back to Library")) }
             Text(tr("文字记录", "Text record"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             Box {
-                IconButton(onClick = { shareMenu = true }, enabled = session != null, modifier = Modifier.testTag("record-share").semantics { contentDescription = shareLabel }) { Text("📤", fontSize = 21.sp) }
+                IconButton(onClick = { shareMenu = true }, enabled = session != null, modifier = Modifier.testTag("record-share").semantics { contentDescription = shareLabel }) { Icon(painterResource(R.drawable.ic_share_upload), null, Modifier.size(24.dp)) }
                 DropdownMenu(shareMenu, { shareMenu = false }, modifier = Modifier.testTag("record-share-menu")) {
                     DropdownMenuItem(text = { Text(tr("复制全文", "Copy all")) }, onClick = { shareMenu = false; model.copySession(id) })
                     DocumentFormat.entries.forEach { format ->
@@ -354,8 +356,10 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
     "FINISHED", "COMPLETED" -> tr("已完成", "Finished"); "INTERRUPTED", "ERROR" -> tr("已中断", "Interrupted")
     "PAUSED" -> tr("已暂停", "Paused"); else -> tr("进行中", "In progress")
 }
+internal val LocalConnectedModelPanel = staticCompositionLocalOf { false }
+
 @Composable internal fun ReadingSurface(backgroundAlpha: Float = .20f, content: @Composable () -> Unit) {
-    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = backgroundAlpha),
+    Surface(shape = if (LocalConnectedModelPanel.current) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(20.dp), color = if (LocalConnectedModelPanel.current) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = backgroundAlpha),
         contentColor = MaterialTheme.colorScheme.onSurface, content = content)
 }
 @Composable internal fun ErrorText(message: String) {

@@ -2,6 +2,9 @@ package io.github.vexpaer.openlistener
 
 import android.content.Intent
 import android.graphics.Bitmap
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
@@ -54,6 +57,7 @@ class UiFlowTest {
         app.repository.observeSessions().first().forEach { app.repository.deleteSession(it.id) }
         app.preferences.setLanguage("zh")
         app.preferences.setTheme("light")
+        app.preferences.setThemeColor(0xFFD97757L)
         app.preferences.setReducedMotion(true)
         app.preferences.setRetainAudio(false)
         app.preferences.setLocalAsrModel(io.github.vexpaer.openlistener.models.ModelCatalog.DEFAULT_ID)
@@ -296,6 +300,52 @@ class UiFlowTest {
         } finally {
             app.credentials.remove("doubao_ast", "api_key")
             runBlocking { app.preferences.setProviders("local", "mlkit") }
+        }
+    }
+
+    @Test fun accentChangesActualSky_colorWheelCancelApply_andRoundedModelPanels() {
+        reset()
+        ActivityScenario.launch<MainActivity>(Intent(app, MainActivity::class.java)).use { scenario ->
+            compose.onNodeWithTag("tab-settings").performClick()
+            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("theme-color-custom"))
+            compose.waitForIdle()
+            fun backgroundPixel(): Color {
+                val pixels = compose.onNodeWithTag("ambient-sky").captureToImage().toPixelMap()
+                return pixels[2, pixels.height / 2]
+            }
+            val orange = backgroundPixel()
+            compose.onNodeWithTag("theme-color-" + 0xFF5FAF91L).performClick()
+            compose.waitForIdle()
+            val green = backgroundPixel()
+            assertTrue("Actual background must respond to accent changes", orange != green)
+            assertTrue("Green accent should produce a green sky", green.green > green.red)
+            compose.onNodeWithTag("theme-color-custom").performClick()
+            compose.onNodeWithTag("theme-color-wheel").assertIsDisplayed().performTouchInput {
+                click(androidx.compose.ui.geometry.Offset(width * .90f, height * .50f))
+            }
+            compose.onNodeWithTag("theme-color-cancel").performClick()
+            assertEquals(0xFF5FAF91L, runBlocking { app.preferences.preferences.first().themeColor })
+            compose.onNodeWithTag("theme-color-custom").performClick()
+            compose.onNodeWithTag("theme-color-wheel").performTouchInput {
+                click(androidx.compose.ui.geometry.Offset(width * .90f, height * .50f))
+            }
+            compose.onNodeWithTag("theme-color-apply").performClick()
+            compose.waitForIdle()
+            val custom = runBlocking { app.preferences.preferences.first().themeColor }
+            assertTrue(custom != 0xFF5FAF91L)
+            screenshot("13-custom-theme-wheel-applied")
+            scenario.recreate()
+            compose.waitForIdle()
+            assertEquals(custom, runBlocking { app.preferences.preferences.first().themeColor })
+            compose.onNodeWithTag("tab-settings").performClick()
+            compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("asr-settings"))
+            compose.onNodeWithTag("asr-settings").performClick()
+            compose.onNodeWithTag("asr-cloud-models").performClick()
+            compose.onNodeWithTag("asr-credentials").assertIsDisplayed()
+            screenshot("14-connected-cloud-panel")
+            compose.onNodeWithTag("asr-local-models").performClick()
+            compose.onNodeWithTag("download-asr-model-zipformer-bilingual-zh-en-2023-02-20-mobile").assertIsDisplayed()
+            screenshot("15-connected-local-panel")
         }
     }
 

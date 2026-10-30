@@ -6,7 +6,7 @@
 
 [English](README.md) · [构建](#构建) · [隐私](PRIVACY.md)
 
-> **[下载 v0.1.8](https://github.com/vexpaer/open-listener/releases/tag/v0.1.8)** · ARM64 / Universal APK；支持应用内更新。
+> **[下载 v0.1.9](https://github.com/vexpaer/open-listener/releases/tag/v0.1.9)** · ARM64 / Universal APK；支持应用内更新。
 
 Open Listener 面向课程、讲座和研讨会。打开应用后在可见页面点击一次，实时阅读原文与译文，并将已经确认的文字保存为可搜索记录。“保留录音”默认关闭，开启后可将新会话录音保存在本机。
 
@@ -16,7 +16,9 @@ Open Listener 面向课程、讲座和研讨会。打开应用后在可见页面
 
 ## 功能
 
-- **主题色自定义：** 默认 Claude 风格橙色，可选择预设颜色或输入 HEX 值实时预览；使用 OKLCH 自动生成协调的三色背景，动态光晕与深浅模式同步适配，并在本地保存。
+背景运动速度提高一倍；本地 / 云端模型的连接处改用直角贴合，并使用滑动选中底色，记录分享改用线框上传图标。
+
+- **主题色自定义：** 默认 Claude 风格橙色，可选择预设颜色，或点击彩色圆打开选色盘并调节亮度；使用 OKLCH 自动生成协调的三色背景，动态光晕与深浅模式同步适配，并在本地保存。
 - **交互优化：** 20% 不透明度的半透明面板、随主题色变化的音量柱与选中态、留有间距的页面滑动，以及与内容面板连贯的本地／云端模型切换。
 
 
@@ -43,6 +45,8 @@ UI 测试中的示例文字会明确标注为测试构建示例，不代表真�
 ```bash
 ./gradlew lintDebug testDebugUnitTest assembleDebug
 ```
+
+CI 保留编译、Lint、JVM 单元测试和 APK 构建，已移除模拟器测试。
 
 该命令适用于已有 Android 工具链的环境；项目支持的可复现构建路径是 GitHub Actions。贡献方式见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
 

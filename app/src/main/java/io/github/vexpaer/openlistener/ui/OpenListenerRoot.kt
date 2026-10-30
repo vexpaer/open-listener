@@ -62,6 +62,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.github.vexpaer.openlistener.service.MicrophoneRecognitionService.State
 import io.github.vexpaer.openlistener.ui.theme.LocalDarkAppearance
+import io.github.vexpaer.openlistener.ui.theme.LocalThemeTones
+import androidx.compose.ui.graphics.lerp
 import java.util.Locale
 
 internal val LocalChinese = staticCompositionLocalOf { true }
@@ -185,10 +187,11 @@ private fun rememberMotionEnvironment(): MotionEnvironment {
     return environment
 }
 
-/** Soft blue light and fine grain, drawn natively without a full-screen blur pass. */
+/** Theme-colored light and fine grain, drawn natively without a full-screen blur pass. */
 @Composable
 private fun AmbientSky(motion: Boolean, foreground: Boolean) {
     val dark = LocalDarkAppearance.current
+    val tones = LocalThemeTones.current
     val phase = remember { Animatable(0f) }
     val grain = remember {
         val random = Random(214)
@@ -199,15 +202,14 @@ private fun AmbientSky(motion: Boolean, foreground: Boolean) {
     }
     LaunchedEffect(motion, foreground) {
         if (motion && foreground) while (true) {
-            phase.animateTo((2 * PI).toFloat(), tween(160_000, easing = LinearEasing))
+            phase.animateTo((2 * PI).toFloat(), tween(80_000, easing = LinearEasing))
             phase.snapTo(0f) // Both ends describe the same sin/cos positions.
         }
     }
     Canvas(Modifier.fillMaxSize().testTag("ambient-sky")) {
         val t = phase.value // Read animation state during drawing, without recomposing the UI.
         drawRect(Brush.linearGradient(
-            if (dark) listOf(Color(0xFF15253C), Color(0xFF243F5D), Color(0xFF101E33))
-            else listOf(Color(0xFFAACBE9), Color(0xFF85B2D8), Color(0xFFC5DFEE)),
+            tones,
             start = Offset.Zero, end = Offset(size.width, size.height)))
         fun haze(x: Float, y: Float, rx: Float, ry: Float, color: Color) {
             withTransform({
@@ -220,13 +222,13 @@ private fun AmbientSky(motion: Boolean, foreground: Boolean) {
                     center = Offset.Zero, radius = 1f), radius = 1f, center = Offset.Zero)
             }
         }
-        val white = if (dark) Color(0xFFAACEE9).copy(alpha = .13f) else Color(0xFFF7FBFF).copy(alpha = .70f)
-        val blue = if (dark) Color(0xFF5B88B8).copy(alpha = .13f) else Color(0xFF6197C7).copy(alpha = .25f)
+        val white = lerp(tones[2], Color.White, if (dark) .15f else .80f).copy(alpha = if (dark) .13f else .70f)
+        val accent = tones[1].copy(alpha = if (dark) .13f else .25f)
         haze(.18f + .09f * sin(t), .13f + .05f * cos(t), .95f, .26f, white)
-        haze(.66f + .08f * cos(t + 1f), .32f + .06f * sin(t), .66f, .39f, blue)
+        haze(.66f + .08f * cos(t + 1f), .32f + .06f * sin(t), .66f, .39f, accent)
         haze(.30f + .10f * cos(t + 2f), .56f + .07f * sin(t + 1f), .85f, .30f, white)
         haze(.85f + .06f * sin(t + 3f), .78f + .08f * cos(t), .70f, .36f, white.copy(alpha = white.alpha * .85f))
-        haze(.05f + .08f * cos(t), .95f + .07f * sin(t + 2f), .85f, .29f, blue)
+        haze(.05f + .08f * cos(t), .95f + .07f * sin(t + 2f), .85f, .29f, accent)
         drawImage(grain, dstSize = IntSize(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1)),
             alpha = if (dark) .32f else .55f, filterQuality = FilterQuality.Low)
     }
