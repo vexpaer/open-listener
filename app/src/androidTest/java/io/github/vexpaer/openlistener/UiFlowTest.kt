@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.test.assertDoesNotExist
+import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.performTextReplacement
@@ -121,6 +123,12 @@ class UiFlowTest {
                 compose.onAllNodes(hasText("仅测试构建中的示例译文")).fetchSemanticsNodes().isNotEmpty()
             }
             compose.onNodeWithText("仅测试构建中的示例译文").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithTag("record-reading-area").assertIsDisplayed()
+            compose.onNodeWithText("导出 PDF").assertDoesNotExist()
+            compose.onNodeWithTag("record-share").performClick()
+            compose.onNodeWithText("导出 PDF").assertIsDisplayed()
+            compose.onNodeWithText("复制全文").performClick()
+            compose.onNodeWithTag("record-share-menu").assertDoesNotExist()
             screenshot("06-test-build-illustrative-transcript")
             // Real persisted text is the source of truth, not a transient ASR event.
             assertEquals("仅测试构建中的示例译文", runBlocking { app.repository.listSegments(id).single().translated })
@@ -143,7 +151,8 @@ class UiFlowTest {
             compose.onNodeWithTag("asr-api-help").performClick()
             compose.onNodeWithTag("api-guide-page").assertIsDisplayed()
             compose.onNodeWithTag("api-guide-link-0").assertHasClickAction()
-            compose.onNodeWithText("https://console.volcengine.com/speech/new/setting/apikeys").assertIsDisplayed()
+            compose.onNodeWithText("https://console.volcengine.com/speech/new/setting/apikeys").performScrollTo().assertIsDisplayed()
+            screenshot("08-api-guide")
             compose.onNodeWithTag("api-guide-back").performClick()
             compose.onNodeWithText("阿里云").assertIsEnabled()
             compose.onNodeWithText("OpenAI").assertIsEnabled()
@@ -154,7 +163,7 @@ class UiFlowTest {
             compose.onNodeWithText("阿里云").performClick()
             compose.waitUntil(10_000) { runBlocking { app.preferences.preferences.first().translationProvider == "qwen" } }
             compose.onNodeWithTag("translation-api-help").performClick()
-            compose.onNodeWithText("https://bailian.console.aliyun.com/cn-beijing/model/settings/api-key").assertIsDisplayed()
+            compose.onNodeWithText("https://bailian.console.aliyun.com/cn-beijing/model/settings/api-key").performScrollTo().assertIsDisplayed()
             compose.onNodeWithTag("api-guide-back").performClick()
             compose.onNodeWithTag("translation-credentials").performClick()
             compose.onNodeWithText("Model / Endpoint ID").performTextReplacement("test-only-draft-model")
@@ -174,6 +183,12 @@ class UiFlowTest {
             compose.onNodeWithTag("listen-primary").assertWidthIsEqualTo(80.dp).assertHeightIsEqualTo(80.dp)
             compose.onNodeWithTag("stop-listening").assertWidthIsEqualTo(80.dp).assertHeightIsEqualTo(80.dp)
             screenshot("07-dark-matching-controls")
+            RecognitionRuntime.updateState(MicrophoneRecognitionService.State.RECORDING)
+            RecognitionRuntime.updateLevel(.12f)
+            compose.onNodeWithTag("recording-bars").assertIsDisplayed()
+            screenshot("09-recording-bars")
+            RecognitionRuntime.updateState(MicrophoneRecognitionService.State.PAUSED)
+            compose.onNodeWithTag("recording-bars").assertDoesNotExist()
         }
     }
 
@@ -193,11 +208,42 @@ class UiFlowTest {
         }
     }
 
+    @Test fun compactSettings_andSingleRowUpdates_inBothLanguages() {
+        for (language in listOf("zh", "en")) {
+            reset()
+            runBlocking { app.preferences.setLanguage(language) }
+            ActivityScenario.launch<MainActivity>(Intent(app, MainActivity::class.java)).use {
+                compose.onNodeWithTag("tab-settings").performClick()
+                val speech = compose.onNodeWithTag("asr-settings").fetchSemanticsNode().boundsInRoot
+                val translation = compose.onNodeWithTag("translation-settings").fetchSemanticsNode().boundsInRoot
+                assertTrue("Compact engine rows should be adjacent", translation.top - speech.bottom < 12)
+                compose.onNodeWithText(if (language == "zh") "识别引擎与模型" else "Engines & models").assertDoesNotExist()
+                compose.onNodeWithTag("settings-page").performScrollToNode(hasTestTag("update-actions"))
+                val check = compose.onNodeWithTag("check-updates").fetchSemanticsNode().boundsInRoot
+                val download = compose.onNodeWithTag("download-update").fetchSemanticsNode().boundsInRoot
+                assertEquals(check.top, download.top, 1f)
+                assertTrue(download.left >= check.right)
+                val textLayout = mutableListOf<TextLayoutResult>()
+                compose.onNodeWithText(if (language == "zh") "检查更新" else "Check update")
+                    .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(textLayout) }
+                assertEquals(1, textLayout.single().lineCount)
+                screenshot("10-compact-update-$language")
+            }
+        }
+    }
+
     private fun screenshot(name: String) {
         compose.waitForIdle()
         val directory = File(instrumentation.targetContext.filesDir, "screenshots").apply { check(exists() || mkdirs()) }
         val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: error("UiAutomation did not return a screenshot")
         File(directory, "$name.png").outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         bitmap.recycle()
+        // Shell-owned screenshots survive connectedAndroidTest's app-data cleanup.
+        instrumentation.uiAutomation.executeShellCommand("mkdir -p /sdcard/Download/openlistener-ui").use {
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(it).readBytes()
+        }
+        instrumentation.uiAutomation.executeShellCommand("screencap -p /sdcard/Download/openlistener-ui/$name.png").use {
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(it).readBytes()
+        }
     }
 }

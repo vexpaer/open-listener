@@ -10,7 +10,7 @@ Native Android · live bilingual text · optional audio retention
 
 [中文说明](README.zh-CN.md) · [Build](#build) · [Privacy](PRIVACY.md) · [License](LICENSE)
 
-**[Download v0.1.5](https://github.com/vexpaer/open-listener/releases/tag/v0.1.5) · ARM64 and Universal APKs**
+**[Download v0.1.6](https://github.com/vexpaer/open-listener/releases/tag/v0.1.6) · ARM64 and Universal APKs**
 
 </div>
 
@@ -58,7 +58,7 @@ The command is for a machine that already has the Android toolchain; the hosted 
 
 ## Development status
 
-The current version is `0.1.5`. Release downloads include a Universal APK and a smaller ARM64 APK; the in-app updater selects the compatible asset automatically. A provider is shown as ready only after its model or credentials pass the local availability check. Real provider credentials are intentionally not included in CI; protocol tests use anonymized fixtures and mock servers. See [`CHANGELOG.md`](CHANGELOG.md) and [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
+The current version is `0.1.6`. Release downloads include a Universal APK and a smaller ARM64 APK; the in-app updater selects the compatible asset automatically. A provider is shown as ready only after its model or credentials pass the local availability check. Real provider credentials are intentionally not included in CI; protocol tests use anonymized fixtures and mock servers. See [`CHANGELOG.md`](CHANGELOG.md) and [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
 ## License
 

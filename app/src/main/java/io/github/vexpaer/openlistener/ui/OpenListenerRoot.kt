@@ -19,6 +19,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlin.math.sqrt
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.selection.selectable
@@ -71,7 +76,7 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
         "zh" -> true; "en" -> false; else -> configuration.locales[0].language == "zh"
     }
     val environment = rememberMotionEnvironment()
-    val motion = foreground && !environment.lowPower && environment.animatorScale > 0f
+    val motion = foreground && !preferences.reducedMotion && !environment.lowPower && environment.animatorScale > 0f
     CompositionLocalProvider(LocalChinese provides chinese, LocalMotionAllowed provides motion) {
         val nav = rememberNavController()
         val backStack by nav.currentBackStackEntryAsState()
@@ -99,12 +104,15 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
                 Column(Modifier.fillMaxSize().padding(padding).widthIn(max = 840.dp).align(Alignment.TopCenter)
                     .padding(horizontal = 20.dp).alpha(entrance)) {
                     val routes = listOf("listen", "library", "settings")
-                    TabRow(selectedTabIndex = selected, containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .55f),
+                    Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 18.dp).clip(RoundedCornerShape(percent = 50))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = .55f))) {
+                    RecordingBars(viewModel, foreground, motion)
+                    TabRow(selectedTabIndex = selected, containerColor = Color.Transparent,
                         contentColor = MaterialTheme.colorScheme.onSurface, divider = {},
                         indicator = { positions ->
                             Box(Modifier.tabIndicatorOffset(positions[selected]).padding(4.dp).fillMaxHeight()
                                 .clip(RoundedCornerShape(percent = 50)).background(MaterialTheme.colorScheme.primary.copy(alpha = .12f)))
-                        }, modifier = Modifier.padding(top = 8.dp, bottom = 18.dp).clip(RoundedCornerShape(percent = 50))) {
+                        }, modifier = Modifier.fillMaxWidth()) {
                         listOf(tr("录音", "Listen"), tr("记录", "Library"), tr("设置", "Settings")).forEachIndexed { index, label ->
                             // The moving pill is the only selection/press background.
                             Box(Modifier.heightIn(min = 52.dp).testTag("tab-${routes[index]}")
@@ -114,6 +122,7 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
                                 Text(label, fontWeight = if (selected == index) FontWeight.SemiBold else FontWeight.Normal)
                             }
                         }
+                    }
                     }
                     NavHost(navController = nav, startDestination = "home", modifier = Modifier.weight(1f),
                         enterTransition = { fadeIn(tween(if (motion) 220 else 0)) },
@@ -229,4 +238,30 @@ internal fun date(ms: Long): String = java.text.SimpleDateFormat("yyyy-MM-dd HH:
 @Composable internal fun languageName(code: String): String = when (code.lowercase()) {
     "en" -> tr("英语", "English"); "zh", "zh-cn" -> tr("简体中文", "Chinese"); "ja" -> tr("日语", "Japanese"); "ko" -> tr("韩语", "Korean")
     "fr" -> tr("法语", "French"); "de" -> tr("德语", "German"); "es" -> tr("西班牙语", "Spanish"); else -> code
+}
+
+@Composable
+private fun BoxScope.RecordingBars(model: OpenListenerViewModel, foreground: Boolean, motion: Boolean) {
+    val state by model.serviceState.collectAsState()
+    val level by model.level.collectAsState()
+    val latest by rememberUpdatedState(level)
+    var samples by remember { mutableStateOf(List(48) { 0f }) }
+    val active = state == State.RECORDING && foreground
+    LaunchedEffect(active, motion) {
+        samples = List(48) { 0f }
+        if (active && motion) while (isActive) {
+            samples = samples.drop(1) + (sqrt(latest.coerceAtLeast(0f)) * 3f).coerceIn(0f, 1f)
+            delay(75)
+        }
+    }
+    val color = MaterialTheme.colorScheme.primary.copy(alpha = .30f)
+    if (active) Canvas(Modifier.matchParentSize().testTag("recording-bars")) {
+        val step = size.width / samples.size
+        samples.forEachIndexed { index, sample ->
+            val value = if (motion) sample else (sqrt(level.coerceAtLeast(0f)) * 3f).coerceIn(0f, 1f)
+            val height = size.height * .82f * value
+            if (height > .5f) drawRoundRect(color, topLeft = Offset(index * step + step * .20f, size.height - height),
+                size = Size(step * .60f, height), cornerRadius = CornerRadius(step * .3f))
+        }
+    }
 }
