@@ -6,11 +6,19 @@
 
 [English](README.md) · [构建](#构建) · [隐私](PRIVACY.md)
 
-> **[下载 v0.1.7](https://github.com/vexpaer/open-listener/releases/tag/v0.1.7)** · ARM64 / Universal APK；支持应用内更新。
+> **[下载 v0.1.8](https://github.com/vexpaer/open-listener/releases/tag/v0.1.8)** · ARM64 / Universal APK；支持应用内更新。
 
 Open Listener 面向课程、讲座和研讨会。打开应用后在可见页面点击一次，实时阅读原文与译文，并将已经确认的文字保存为可搜索记录。“保留录音”默认关闭，开启后可将新会话录音保存在本机。
 
+<div align="center">
+<img src="app/src/main/res/drawable/ic_launcher.png" width="76" alt="Open Listener 胡萝卜图标" />
+</div>
+
 ## 功能
+
+- **主题色自定义：** 默认 Claude 风格橙色，可选择预设颜色或输入 HEX 值实时预览；使用 OKLCH 自动生成协调的三色背景，动态光晕与深浅模式同步适配，并在本地保存。
+- **交互优化：** 20% 不透明度的半透明面板、随主题色变化的音量柱与选中态、留有间距的页面滑动，以及与内容面板连贯的本地／云端模型切换。
+
 
 - **录音：** 顶部三 Tab 与左右滑动切换、双语实时文字、partial/final 区分、通知栏暂停/继续/结束。
 - **记录：** Room 持久化已确认段落，支持搜索、复制、改标题、删除、Markdown/PDF 导出和 Android 分享。
