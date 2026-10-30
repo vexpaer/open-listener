@@ -124,7 +124,7 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
                                 onCopy = { model.copyText(it) }, onRetry = { model.retryTranslation(segment.sessionId, segment.sequence) }, live = true, canRetry = prefs.asrProvider != "doubao_ast")
                         }
                         visiblePartial?.let { event -> item(key = "partial-${event.segmentId}") { PartialParagraph(event, mode, prefs.subtitleFontScale) } }
-                        item(key = "live-tail") { Spacer(Modifier.height(1.dp).testTag("live-tail")) }
+                        item(key = "live-tail") { Spacer(Modifier.fillMaxWidth().height(1.dp).testTag("live-tail")) }
                     }
                 }
                 active -> EmptyReading(Icons.Outlined.GraphicEq, tr("等待第一段文字", "Waiting for the first words"),

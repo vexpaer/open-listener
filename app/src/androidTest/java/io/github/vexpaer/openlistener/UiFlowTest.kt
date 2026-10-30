@@ -245,6 +245,7 @@ class UiFlowTest {
         RecognitionRuntime.begin(id); RecognitionRuntime.updateState(MicrophoneRecognitionService.State.RECORDING)
         try {
             ActivityScenario.launch<MainActivity>(Intent(app, MainActivity::class.java)).use {
+                try {
                 fun atTail() = runCatching { compose.onNodeWithTag("live-tail").assertIsDisplayed() }.isSuccess
                 compose.waitUntil(10_000) { atTail() }
                 runBlocking { app.repository.updateTranslation(id, 1, "译文继续增长，仍应跟随到段落最底部。".repeat(100), "COMPLETED") }
@@ -265,6 +266,7 @@ class UiFlowTest {
                 RecognitionRuntime.updatePartial(TranscriptEvent(id, 2, true, "Growing partial sentence. ".repeat(140), 1000, null, 3))
                 compose.waitForIdle(); compose.onNodeWithTag("live-tail").assertIsDisplayed()
                 screenshot("11-live-following")
+                } catch (error: Throwable) { screenshot("11-follow-failure"); throw error }
             }
         } finally {
             RecognitionRuntime.end(); RecognitionRuntime.updateState(MicrophoneRecognitionService.State.IDLE)
