@@ -109,7 +109,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                         Text("Open Listener  v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.titleMedium)
                         Row(Modifier.fillMaxWidth().testTag("update-actions"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick = model::checkUpdates, enabled = !updates.checking && !updates.downloading,
-                                modifier = Modifier.weight(1f).testTag("check-updates"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text(if (updates.checking) tr("检查中…", "Checking…") else tr("检查更新", "Check update"), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) }
+                                modifier = Modifier.weight(1f).testTag("check-updates"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text(if (updates.checking) tr("检查中…", "Checking…") else tr("检查更新", "Check updates"), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) }
                             OutlinedButton(onClick = model::downloadUpdate, enabled = updates.update != null && !updates.downloading && !updates.checking && editingAllowed && updates.file == null,
                                 modifier = Modifier.weight(1f).testTag("download-update"), contentPadding = PaddingValues(horizontal = 8.dp)) { Text(tr("下载更新", "Download"), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis) }
                         }

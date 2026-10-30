@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -259,12 +261,13 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
     var shareMenu by rememberSaveable(id) { mutableStateOf(false) }
     var title by rememberSaveable(id) { mutableStateOf("") }
     val list = rememberLazyListState()
+    val shareLabel = tr("分享与导出", "Share and export")
     Column(Modifier.fillMaxSize().testTag("session-detail")) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, tr("返回记录", "Back to Library")) }
             Text(tr("文字记录", "Text record"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             Box {
-                IconButton(onClick = { shareMenu = true }, enabled = session != null, modifier = Modifier.testTag("record-share")) { Text("📤", fontSize = 21.sp) }
+                IconButton(onClick = { shareMenu = true }, enabled = session != null, modifier = Modifier.testTag("record-share").semantics { contentDescription = shareLabel }) { Text("📤", fontSize = 21.sp) }
                 DropdownMenu(shareMenu, { shareMenu = false }, modifier = Modifier.testTag("record-share-menu")) {
                     DropdownMenuItem(text = { Text(tr("复制全文", "Copy all")) }, onClick = { shareMenu = false; model.copySession(id) })
                     DocumentFormat.entries.forEach { format ->

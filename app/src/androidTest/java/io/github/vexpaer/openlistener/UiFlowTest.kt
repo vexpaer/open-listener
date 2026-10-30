@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
-import androidx.compose.ui.test.assertDoesNotExist
 import org.junit.Assert.assertTrue
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertTextContains
@@ -224,7 +223,7 @@ class UiFlowTest {
                 assertEquals(check.top, download.top, 1f)
                 assertTrue(download.left >= check.right)
                 val textLayout = mutableListOf<TextLayoutResult>()
-                compose.onNodeWithText(if (language == "zh") "检查更新" else "Check update")
+                compose.onNodeWithText(if (language == "zh") "检查更新" else "Check updates")
                     .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(textLayout) }
                 assertEquals(1, textLayout.single().lineCount)
                 screenshot("10-compact-update-$language")
