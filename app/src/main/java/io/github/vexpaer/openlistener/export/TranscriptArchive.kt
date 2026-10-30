@@ -30,7 +30,7 @@ object TranscriptArchive {
                     require(remaining <= Int.MAX_VALUE - 44) { "Recording exceeds WAV size limit" }
                     zip.putNextEntry(ZipEntry("$folder/recording.wav"))
                     audio.inputStream().buffered().use { input ->
-                        check(input.skip(44) == 44L) { "Incomplete WAV header" }
+                        kotlin.check(input.skip(44) == 44L) { "Incomplete WAV header" }
                         zip.write(WavAudio.header(remaining.toInt()))
                         val buffer = ByteArray(32 * 1024)
                         while (remaining > 0) {

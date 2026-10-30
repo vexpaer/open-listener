@@ -1,0 +1,8 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><shape android:shape="rectangle"><solid android:color="#FFFFFF" /></shape></item>
+    <item>
+        <inset android:insetLeft="10%" android:insetTop="10%" android:insetRight="10%" android:insetBottom="10%">
+            <bitmap android:src="@drawable/ic_launcher_artwork" android:gravity="fill" android:filter="true" />
+        </inset>
+    </item>
+</layer-list>

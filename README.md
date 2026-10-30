@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="app/src/main/res/drawable/ic_launcher.png" width="76" alt="Open Listener logo" />
+<img src="docs/images/mark.svg" width="76" alt="Open Listener logo" />
 
 # Open Listener
 

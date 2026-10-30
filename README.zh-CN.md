@@ -11,7 +11,7 @@
 Open Listener 面向课程、讲座和研讨会。打开应用后在可见页面点击一次，实时阅读原文与译文，并将已经确认的文字保存为可搜索记录。“保留录音”默认关闭，开启后可将新会话录音保存在本机。
 
 <div align="center">
-<img src="app/src/main/res/drawable/ic_launcher.png" width="76" alt="Open Listener 胡萝卜图标" />
+<img src="docs/images/mark.svg" width="76" alt="Open Listener 胡萝卜图标" />
 </div>
 
 ## 功能
