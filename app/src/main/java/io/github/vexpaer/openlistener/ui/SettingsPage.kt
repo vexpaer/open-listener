@@ -2,6 +2,13 @@ package io.github.vexpaer.openlistener.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -97,10 +104,28 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                 }
                 item {
                     SettingsSection(tr("外观", "Appearance"), Icons.Outlined.WbSunny) {
-                        SettingChoice(tr("主题", "Theme"), listOf("light" to tr("浅色", "Light"), "dark" to tr("深色", "Dark")),
+                        InlineToggle(tr("主题", "Theme"), "light" to tr("浅色", "Light"), "dark" to tr("深色", "Dark"),
                             if (LocalDarkAppearance.current) "dark" else "light", model::setTheme)
-                        SettingChoice(tr("界面语言", "App language"), listOf("zh" to "简体中文", "en" to "English"),
+                        InlineToggle(tr("界面语言", "App language"), "zh" to "中文", "en" to "English",
                             if (LocalChinese.current) "zh" else "en", model::setLanguage)
+                        Text(tr("主题颜色", "Accent color"), style = MaterialTheme.typography.labelLarge)
+                        val accents = listOf(0xFFD97757L, 0xFF7B9ACAL, 0xFF8B78C9L, 0xFF5FAF91L, 0xFFE5A548L, 0xFFCF778DL)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            accents.forEach { color ->
+                                val selected = prefs.themeColor == color
+                                Surface(onClick = { model.setThemeColor(color) }, shape = RoundedCornerShape(50),
+                                    color = Color(color.toInt()), border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface) else null,
+                                    modifier = Modifier.size(if (selected) 38.dp else 34.dp).testTag("theme-color-" + color)) {}
+                            }
+                        }
+                        var customHex by remember(prefs.themeColor) { mutableStateOf("%06X".format(prefs.themeColor and 0xFFFFFF)) }
+                        OutlinedTextField(value = customHex, onValueChange = { input ->
+                            if (input.length <= 6 && input.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }) {
+                                customHex = input
+                                if (input.length == 6) input.toLongOrNull(16)?.let { model.setThemeColor(0xFF000000L or it) }
+                            }
+                        }, label = { Text(tr("自定义 HEX（实时预览）", "Custom HEX · live preview")) },
+                            prefix = { Text("#") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         Text("${tr("字幕字号", "Subtitle size")} · ${(font * 100).toInt()}%", style = MaterialTheme.typography.labelLarge)
                         Slider(font, { font = it }, valueRange = .85f..1.5f, steps = 12,
                             onValueChangeFinished = { model.setSubtitleFontScale(font) }, modifier = Modifier.testTag("subtitle-size"))
@@ -384,14 +409,41 @@ private fun LanguageChoice(title: String, value: String, enabled: Boolean, onSel
 }
 private fun bytes(value: Long): String = if (value < 1_048_576) "%.0f KB".format(Locale.ROOT, value / 1024.0) else "%.1f MB".format(Locale.ROOT, value / 1_048_576.0)
 
-@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun InlineToggle(title: String, first: Pair<String, String>, second: Pair<String, String>, selected: String, onSelect: (String) -> Unit) {
+    Row(Modifier.fillMaxWidth().height(42.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+        Row(Modifier.width(196.dp).fillMaxHeight().clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = .20f))) {
+            listOf(first, second).forEach { (key, label) ->
+                val background by animateColorAsState(if (selected == key) MaterialTheme.colorScheme.primary.copy(alpha = .22f) else Color.Transparent,
+                    animationSpec = tween(230), label = "settings-selection")
+                Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(50)).background(background)
+                    .clickable { onSelect(key) }, contentAlignment = Alignment.Center) {
+                    Text(label, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun ModelCategories(local: Boolean, enabled: Boolean, tag: String, onLocal: () -> Unit, onCloud: () -> Unit) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip(local, onClick = onLocal, enabled = enabled, modifier = Modifier.testTag("$tag-local-models"),
-            label = { Text(tr("本地模型", "Local models")) })
-        FilterChip(!local, onClick = onCloud, enabled = enabled, modifier = Modifier.testTag("$tag-cloud-models"),
-            label = { Text(tr("云端模型", "Cloud models")) })
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+        listOf(true to tr("本地模型", "Local models"), false to tr("云端模型", "Cloud models")).forEach { (isLocal, label) ->
+            val selected = local == isLocal
+            val selectedColor by animateColorAsState(
+                if (selected) MaterialTheme.colorScheme.surface.copy(alpha = .20f) else Color.Transparent,
+                animationSpec = tween(260), label = "model-tab")
+            val shape = if (isLocal) RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp) else RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+            Box(Modifier.weight(1f).height(56.dp).clip(shape).background(selectedColor)
+                .clickable(enabled = enabled) { if (isLocal) onLocal() else onCloud() }
+                .testTag("$tag-" + if (isLocal) "local-models" else "cloud-models"),
+                contentAlignment = Alignment.Center) {
+                Text(label, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.titleMedium)
+            }
+        }
     }
 }
 

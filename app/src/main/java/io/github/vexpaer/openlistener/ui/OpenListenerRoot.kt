@@ -130,7 +130,7 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
                         popEnterTransition = { fadeIn(tween(if (motion) 220 else 0)) },
                         popExitTransition = { fadeOut(tween(if (motion) 160 else 0)) }) {
                         composable("home") {
-                            HorizontalPager(state = pager, beyondViewportPageCount = 2,
+                            HorizontalPager(state = pager, beyondViewportPageCount = 2, pageSpacing = 12.dp,
                                 modifier = Modifier.fillMaxSize().testTag("main-pager")) { page ->
                                 when (page) {
                                     0 -> ListenPage(viewModel, foreground && pager.currentPage == 0, onSettings = { navigateTop("settings") })

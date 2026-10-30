@@ -271,7 +271,7 @@ internal fun LibraryPage(model: OpenListenerViewModel, onOpen: (String) -> Unit)
         else LazyColumn(state = list, modifier = Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
             items(sessions, key = { it.session.id }) { entry ->
                 val session = entry.session
-                Surface(onClick = { onOpen(session.id) }, color = MaterialTheme.colorScheme.surface.copy(alpha = .75f), contentColor = MaterialTheme.colorScheme.onSurface, shape = RoundedCornerShape(18.dp),
+                Surface(onClick = { onOpen(session.id) }, color = MaterialTheme.colorScheme.surface.copy(alpha = .20f), contentColor = MaterialTheme.colorScheme.onSurface, shape = RoundedCornerShape(18.dp),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                         Text((if (session.audioPath != null) "🎧 " else "") + session.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -354,7 +354,7 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
     "FINISHED", "COMPLETED" -> tr("已完成", "Finished"); "INTERRUPTED", "ERROR" -> tr("已中断", "Interrupted")
     "PAUSED" -> tr("已暂停", "Paused"); else -> tr("进行中", "In progress")
 }
-@Composable internal fun ReadingSurface(backgroundAlpha: Float = .86f, content: @Composable () -> Unit) {
+@Composable internal fun ReadingSurface(backgroundAlpha: Float = .20f, content: @Composable () -> Unit) {
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = backgroundAlpha),
         contentColor = MaterialTheme.colorScheme.onSurface, content = content)
 }
