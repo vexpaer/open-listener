@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.10 · 2026-10-30
+
+- 反转本地 / 云端模型的选中与未选中视觉效果。
+- 默认主题恢复原来的蓝色；保留用户已保存的自定义颜色。
+- 新增 English GigaSpeech 流式 Zipformer INT8 模型，下载和权重均经过 SHA-256 校验。
+- 设置面板不透明度提高至 30%。
+- 记录页右下角新增全部导出 ZIP，包含每条记录的 Markdown 和已保留的 WAV 录音。
+- 移除识别与翻译准备进度条，开始 / 暂停图形使用连续变形动画。
+- 背景运动再提速两倍：完整周期由 80 秒缩短至 40 秒。
+
 ## 0.1.9 · 2026-10-30
 
 - Remove emulator jobs and the manual emulator workflow; retain build, Lint, JVM tests and release verification.

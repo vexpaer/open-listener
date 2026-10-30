@@ -15,7 +15,7 @@ private val Context.settingsDataStore by preferencesDataStore(name = "settings")
 data class AppPreferences(
     val appLanguage: String = "system",
     val theme: String = "system",
-    val themeColor: Long = 0xFFD97757L,
+    val themeColor: Long = 0xFF406B88L,
     val reducedMotion: Boolean = false,
     val subtitleFontScale: Float = 1f,
     val sourceLanguage: String = "en",
@@ -45,7 +45,7 @@ class PreferencesStore(private val context: Context) {
         AppPreferences(
             appLanguage = values[Keys.appLanguage] ?: "system",
             theme = values[Keys.theme] ?: "system",
-            themeColor = values[Keys.themeColor]?.toLongOrNull() ?: 0xFFD97757L,
+            themeColor = values[Keys.themeColor]?.toLongOrNull() ?: 0xFF406B88L,
             reducedMotion = values[Keys.reducedMotion] ?: false,
             subtitleFontScale = (values[Keys.subtitleFontScale] ?: 1f).coerceIn(.85f, 1.5f),
             sourceLanguage = values[Keys.sourceLanguage] ?: "en",

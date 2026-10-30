@@ -1,5 +1,11 @@
 package io.github.vexpaer.openlistener.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.ui.graphics.Path
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -155,28 +161,34 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
         }
         Column(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 12.dp), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            when (state) {
-                State.PREPARING, State.STOPPING -> {
-                    LinearProgressIndicator(Modifier.fillMaxWidth(.5f))
-                    Text(if (state == State.PREPARING) tr("正在准备识别与翻译…", "Preparing speech and translation…") else tr("正在保存已确认的文字…", "Saving confirmed text…"),
-                        style = MaterialTheme.typography.bodyMedium)
-                }
-                State.RECORDING, State.PAUSED -> Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                    ListeningButton(if (state == State.RECORDING) tr("暂停", "Pause") else tr("继续", "Resume"),
-                        if (state == State.RECORDING) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
-                        level = if (foreground && state == State.RECORDING) rms else 0f,
-                        onClick = if (state == State.RECORDING) model::pauseListening else model::resumeListening)
-                    ListeningButton(tr("结束", "Finish"), Icons.Outlined.Stop, 0f, onClick = model::stopListening,
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                val preparing = state == State.PREPARING || state == State.STOPPING
+                ListeningButton(
+                    label = when (state) {
+                        State.RECORDING -> tr("暂停", "Pause")
+                        State.PAUSED -> tr("继续", "Resume")
+                        else -> tr("开始聆听", "Start listening")
+                    },
+                    level = if (foreground && state == State.RECORDING) rms else 0f,
+                    enabled = !preparing && (active || !check.busy),
+                    recording = state == State.RECORDING,
+                    onClick = when (state) {
+                        State.RECORDING -> model::pauseListening
+                        State.PAUSED -> model::resumeListening
+                        else -> model::startListening
+                    })
+                AnimatedVisibility(visible = active && !preparing,
+                    enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
+                    ListeningButton(tr("结束", "Finish"), 0f, onClick = model::stopListening,
                         stop = true, tag = "stop-listening")
                 }
-                else -> ListeningButton(tr("开始聆听", "Start listening"), Icons.Outlined.Mic, 0f, !check.busy, model::startListening)
             }
         }
     }
 }
 
 @Composable
-private fun ListeningButton(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, level: Float, enabled: Boolean = true, onClick: () -> Unit, stop: Boolean = false, tag: String = "listen-primary") {
+private fun ListeningButton(label: String, level: Float, enabled: Boolean = true, onClick: () -> Unit, stop: Boolean = false, tag: String = "listen-primary", recording: Boolean = false) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val motion = LocalMotionAllowed.current
@@ -201,9 +213,33 @@ private fun ListeningButton(label: String, icon: androidx.compose.ui.graphics.ve
                     .clip(CircleShape).background(Brush.verticalGradient(listOf(top, bottom)))
                     .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = .55f), palette.primary.copy(alpha = .12f))), CircleShape)
                     .testTag(tag)) {
-                Icon(icon, contentDescription = label, modifier = Modifier.size(30.dp))
+                if (stop) Icon(Icons.Outlined.Stop, contentDescription = label, modifier = Modifier.size(30.dp))
+                else PlayPauseGlyph(recording, label, motion)
             }
         }
+    }
+}
+
+@Composable
+private fun PlayPauseGlyph(recording: Boolean, label: String, motion: Boolean) {
+    val progress by animateFloatAsState(if (recording) 1f else 0f,
+        tween(if (motion) 320 else 0), label = "play-pause-morph")
+    val tint = LocalContentColor.current
+    Canvas(Modifier.size(30.dp).semantics { contentDescription = label }) {
+        fun mix(a: Float, b: Float) = a + (b - a) * progress
+        fun polygon(from: List<Offset>, to: List<Offset>) {
+            val path = Path()
+            from.indices.forEach { i ->
+                val x = mix(from[i].x, to[i].x) * size.width / 24f
+                val y = mix(from[i].y, to[i].y) * size.height / 24f
+                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            path.close(); drawPath(path, tint)
+        }
+        polygon(listOf(Offset(7f, 5f), Offset(12f, 7.917f), Offset(12f, 16.083f), Offset(7f, 19f)),
+            listOf(Offset(7f, 5f), Offset(10f, 5f), Offset(10f, 19f), Offset(7f, 19f)))
+        polygon(listOf(Offset(12f, 7.917f), Offset(19f, 12f), Offset(19f, 12f), Offset(12f, 16.083f)),
+            listOf(Offset(14f, 5f), Offset(17f, 5f), Offset(17f, 19f), Offset(14f, 19f)))
     }
 }
 
@@ -260,6 +296,9 @@ internal fun LibraryPage(model: OpenListenerViewModel, onOpen: (String) -> Unit)
     val sessions by model.searchResults.collectAsState()
     var query by rememberSaveable { mutableStateOf(model.searchQuery.value) }
     val list = rememberLazyListState()
+    val allSessions by model.sessions.collectAsState()
+    val exporting by model.exportingArchive.collectAsState()
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().testTag("library-page"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OutlinedTextField(value = query, onValueChange = { query = it; model.searchQuery.value = it },
             label = { Text(tr("搜索", "Search")) }, singleLine = true,
@@ -270,7 +309,7 @@ internal fun LibraryPage(model: OpenListenerViewModel, onOpen: (String) -> Unit)
             if (query.isBlank()) tr("还没有记录", "No records yet") else tr("没有匹配的记录", "No matching records"),
             if (query.isBlank()) ""
             else tr("试试其他标题或正文关键词。", "Try another title or phrase."), modifier = Modifier.weight(1f).testTag("library-empty"))
-        else LazyColumn(state = list, modifier = Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
+        else LazyColumn(state = list, modifier = Modifier.weight(1f), contentPadding = PaddingValues(bottom = 100.dp)) {
             items(sessions, key = { it.session.id }) { entry ->
                 val session = entry.session
                 Surface(onClick = { onOpen(session.id) }, color = MaterialTheme.colorScheme.surface.copy(alpha = .20f), contentColor = MaterialTheme.colorScheme.onSurface, shape = RoundedCornerShape(18.dp),
@@ -284,6 +323,13 @@ internal fun LibraryPage(model: OpenListenerViewModel, onOpen: (String) -> Unit)
                 }
             }
         }
+    }
+    FloatingActionButton(onClick = { if (!exporting && allSessions.isNotEmpty()) model.exportAllZip() },
+        modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).testTag("export-all-zip"),
+        containerColor = MaterialTheme.colorScheme.primaryContainer) {
+        if (exporting) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+        else Icon(painterResource(R.drawable.ic_share_upload), tr("全部导出为 ZIP", "Export all as ZIP"), Modifier.size(24.dp))
+    }
     }
 }
 
@@ -357,8 +403,9 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
     "PAUSED" -> tr("已暂停", "Paused"); else -> tr("进行中", "In progress")
 }
 internal val LocalConnectedModelPanel = staticCompositionLocalOf { false }
+internal val LocalReadingSurfaceAlpha = staticCompositionLocalOf { .20f }
 
-@Composable internal fun ReadingSurface(backgroundAlpha: Float = .20f, content: @Composable () -> Unit) {
+@Composable internal fun ReadingSurface(backgroundAlpha: Float = LocalReadingSurfaceAlpha.current, content: @Composable () -> Unit) {
     Surface(shape = if (LocalConnectedModelPanel.current) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(20.dp), color = if (LocalConnectedModelPanel.current) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = backgroundAlpha),
         contentColor = MaterialTheme.colorScheme.onSurface, content = content)
 }

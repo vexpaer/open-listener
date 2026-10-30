@@ -202,7 +202,7 @@ private fun AmbientSky(motion: Boolean, foreground: Boolean) {
     }
     LaunchedEffect(motion, foreground) {
         if (motion && foreground) while (true) {
-            phase.animateTo((2 * PI).toFloat(), tween(80_000, easing = LinearEasing))
+            phase.animateTo((2 * PI).toFloat(), tween(40_000, easing = LinearEasing))
             phase.snapTo(0f) // Both ends describe the same sin/cos positions.
         }
     }

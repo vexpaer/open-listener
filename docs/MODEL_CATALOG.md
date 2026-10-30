@@ -1,6 +1,6 @@
 # Model catalog
 
-This catalog contains two installable, checksum-verified local ASR models. Choose the model in Speech recognition → Local models.
+This catalog contains three installable, checksum-verified local ASR models. Choose the model in Speech recognition → Local models.
 
 ## `zipformer-bilingual-zh-en-2023-02-20-mobile`
 
@@ -79,3 +79,20 @@ Select **Doubao AST** under cloud speech settings. One authenticated WebSocket p
 - Sentence streams are paired using supplied start timestamps, falling back to sentence order. Source finals are retained immediately; translation deltas and finals update that same row. Unfinished translations are marked incomplete on interruption.
 - Pause drains final subtitles and closes the wire session; resume opens a new wire session with continuous app IDs/audio offsets. Unexpected closure, acknowledgement timeouts and provider errors fail explicitly.
 - Validation uses a local WebSocket mock, protobuf wire fixtures, real Room and Android instrumentation. No real provider account is used in CI.
+
+## `zipformer-en-gigaspeech-2023-06-21-mobile`
+
+English-only streaming Zipformer trained on LibriSpeech and GigaSpeech. This adds a broader English training corpus alongside the existing LibriSpeech and bilingual options. Mobile accuracy and throughput depend on the recording and device; no app-specific comparative benchmark has been run.
+
+- [Official model documentation](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-transducer/zipformer-transducer-models.html#csukuangfj-sherpa-onnx-streaming-zipformer-en-2023-06-21-english)
+- [Model card and Apache-2.0 license](https://huggingface.co/marcoyang/icefall-libri-giga-pruned-transducer-stateless7-streaming-2023-04-04)
+- Archive: `365748162` bytes; SHA-256: `b97e7ff75a27136f4dd33c99bb7d5f493094397501be4739578c6cd95ea7f422`.
+- Only the INT8 encoder/joiner, float decoder and token table are installed. The larger float encoder in the archive is skipped.
+- Archive and individual file hashes were measured from the official release download.
+
+| Active relative path | Bytes | SHA-256 |
+|---|---:|---|
+| `joiner-epoch-99-avg-1.int8.onnx` | 259335 | `831477d390e59a61f1b6a6f763b9903e6c6366ff6034f1ddba613be82637122f` |
+| `decoder-epoch-99-avg-1.onnx` | 2092566 | `9da02b77cb08826756ec6a88635f35a40374e4164e7c6359121a9145958a6ceb` |
+| `tokens.txt` | 5048 | `49e3c2646595fd907228b3c6787069658f67b17377c60aeb8619c4551b2316fb` |
+| `encoder-epoch-99-avg-1.int8.onnx` | 111205459 | `c0391141c0faf05142004b96dd5e66830a737386b00a5e638d0a228f051a7b60` |
