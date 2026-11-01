@@ -38,7 +38,8 @@ import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) {
+internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
+                          openPanel: String? = null, onPanelOpened: () -> Unit = {}) {
     val prefs by model.preferences.collectAsState()
     val state by model.serviceState.collectAsState()
     val check by model.engineCheck.collectAsState()
@@ -62,6 +63,16 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
     var showColorPicker by rememberSaveable { mutableStateOf(false) }
     var page by rememberSaveable { mutableStateOf<String?>(null) }
     val sublist = key(page) { rememberLazyListState() }
+    LaunchedEffect(openPanel) {
+        if (openPanel != null) {
+            page = when (openPanel) {
+                "translation" -> if (prefs.asrProvider == "doubao_ast") "translation-integrated"
+                    else if (prefs.translationProvider == "mlkit") "translation-local" else "translation-cloud"
+                else -> if (prefs.asrProvider == "local") "asr-local" else "asr-cloud"
+            }
+            onPanelOpened()
+        }
+    }
     BackHandler(enabled = active && page != null) { page = null }
     Column(Modifier.fillMaxSize()) {
         page?.let { current ->
@@ -95,8 +106,8 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                     if (page == null) {
                         item {
                             SettingsSection(tr("目标语言", "Target language"), Icons.Outlined.Language) {
-                                LanguageChoice(tr("语音源语言", "Spoken language"), prefs.sourceLanguage, editingAllowed) { model.setLanguages(it, prefs.targetLanguage) }
-                                LanguageChoice(tr("翻译目标", "Translation target"), prefs.targetLanguage, editingAllowed) { model.setLanguages(prefs.sourceLanguage, it) }
+                                LanguageChoice(tr("从", "From"), prefs.sourceLanguage, editingAllowed) { model.setLanguages(it, prefs.targetLanguage) }
+                                LanguageChoice(tr("翻译为", "To"), prefs.targetLanguage, editingAllowed) { model.setLanguages(prefs.sourceLanguage, it) }
                                 if (!editingAllowed) Hint(tr("结束聆听后可修改", "Finish listening to edit"))
                             }
                         }
@@ -186,7 +197,11 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                                     Text(notes, style = MaterialTheme.typography.bodySmall)
                                 }
                                 if (!editingAllowed) Hint(tr("结束聆听后可更新", "Finish listening to update"))
-                                TextButton(onClick = { model.openUrl("https://github.com/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPOSITORY}") }) { Text("Github") }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    TextButton(onClick = { model.openUrl("https://github.com/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPOSITORY}") }) { Text("GitHub") }
+                                    Text("by Vexpaer", style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
                         }
                     } else when (page) {
