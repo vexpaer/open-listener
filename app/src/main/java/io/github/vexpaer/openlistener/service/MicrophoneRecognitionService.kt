@@ -302,6 +302,10 @@ class MicrophoneRecognitionService : Service() {
         val subtitle = notificationSubtitleText().trim().take(240)
             .ifEmpty { if (chinese) "等待实时字幕…" else "Waiting for live subtitles…" }
         val volume = notificationVolume()
+        val compact = RemoteViews(packageName, R.layout.notification_compact).apply {
+            setTextViewText(R.id.notification_compact_subtitle, subtitle)
+            setProgressBar(R.id.notification_compact_volume, 100, volume, false)
+        }
         // The system already displays the app's label in the notification header.
         // Use the content title for actual subtitles instead of repeating "Open Listener".
         val expanded = RemoteViews(packageName, R.layout.notification_live).apply {
@@ -316,6 +320,7 @@ class MicrophoneRecognitionService : Service() {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setProgress(100, volume, false)
+            .setCustomContentView(compact)
             .setCustomBigContentView(expanded)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .addAction(0, if (pause) {
