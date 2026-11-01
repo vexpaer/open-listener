@@ -55,6 +55,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.vexpaer.openlistener.asr.TranscriptEvent
@@ -382,6 +388,22 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
     val prefs by model.preferences.collectAsState()
     var mode by rememberSaveable { mutableStateOf(TranscriptMode.BILINGUAL) }
     var rename by rememberSaveable { mutableStateOf(false) }
+    var editMode by rememberSaveable(id) { mutableStateOf(false) }
+    var editingSegment by remember { mutableStateOf<SegmentEntity?>(null) }
+    var editOriginal by remember { mutableStateOf("") }
+    var editTranslated by remember { mutableStateOf("") }
+    var playing by remember(id) { mutableStateOf(false) }
+    var playbackMs by remember(id) { mutableIntStateOf(0) }
+    val renameFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    var titleInput by remember { mutableStateOf(TextFieldValue("")) }
+    LaunchedEffect(rename) {
+        if (rename) {
+            kotlinx.coroutines.delay(120)
+            renameFocus.requestFocus()
+            keyboard?.show()
+        }
+    }
     var delete by rememberSaveable { mutableStateOf(false) }
     var shareMenu by rememberSaveable(id) { mutableStateOf(false) }
     var title by rememberSaveable(id) { mutableStateOf("") }
@@ -390,18 +412,21 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
     Column(Modifier.fillMaxSize().testTag("session-detail")) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, tr("返回记录", "Back to Library")) }
-            Text(tr("文字记录", "Text record"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Spacer(Modifier.weight(1f))
             Box {
                 IconButton(onClick = { shareMenu = true }, enabled = session != null, modifier = Modifier.testTag("record-share").semantics { contentDescription = shareLabel }) { Icon(painterResource(R.drawable.ic_share_upload), null, Modifier.size(24.dp)) }
                 DropdownMenu(shareMenu, { shareMenu = false }, modifier = Modifier.testTag("record-share-menu")) {
                     DropdownMenuItem(text = { Text(tr("复制全文", "Copy all")) }, onClick = { shareMenu = false; model.copySession(id) })
                     DocumentFormat.entries.forEach { format ->
-                        DropdownMenuItem(text = { Text("${tr("导出", "Save")} ${format.extension.uppercase()}") }, onClick = { shareMenu = false; model.requestExport(id, format) })
                         DropdownMenuItem(text = { Text("${tr("分享", "Share")} ${format.extension.uppercase()}") }, onClick = { shareMenu = false; model.shareSession(id, format) })
                     }
                 }
             }
-            IconButton(onClick = { title = session?.title.orEmpty(); rename = true }, enabled = session != null) { Icon(Icons.Outlined.Edit, tr("修改标题", "Rename")) }
+            IconButton(onClick = { editMode = !editMode }, enabled = session != null,
+                modifier = Modifier.background(if (editMode) MaterialTheme.colorScheme.primary.copy(alpha = .22f)
+                    else Color.Transparent, CircleShape).testTag("record-edit-mode")) {
+                Icon(Icons.Outlined.Edit, tr("编辑字幕", "Edit transcript"))
+            }
             IconButton(onClick = { delete = true }, enabled = session != null) { Icon(Icons.Outlined.DeleteOutline, tr("删除记录", "Delete record")) }
         }
         val current = session
@@ -409,27 +434,104 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
             EmptyReading(Icons.Outlined.Description, tr("正在读取记录", "Loading record"), tr("文字保存在此设备。", "Text is stored on this device."))
         } else ReadingSurface {
             val groupedDetails = if (current.asrProvider == "doubao_ast") SentenceGrouper.group(segments) else segments
+            val visibleSegments = if (editMode) segments else groupedDetails
+            val currentIndex = if (playing && !editMode) visibleSegments.indexOfLast {
+                it.startOffsetMs <= playbackMs.toLong()
+            } else -1
+            val playingSequence = visibleSegments.getOrNull(currentIndex)?.sequence
+            LaunchedEffect(playing, playingSequence, editMode) {
+                if (playing && currentIndex >= 0 && !editMode) {
+                    list.animateScrollToItem(currentIndex + 1)
+                }
+            }
             LazyColumn(state = list, modifier = Modifier.fillMaxSize().testTag("record-reading-area"), verticalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(18.dp)) {
             item {
-                Text(current.title, style = MaterialTheme.typography.headlineSmall)
+                Text(current.title, style = MaterialTheme.typography.headlineSmall.copy(
+                        textDecoration = TextDecoration.Underline),
+                    modifier = Modifier.clickable {
+                        titleInput = TextFieldValue(current.title,
+                            selection = TextRange(0, current.title.length))
+                        rename = true
+                    }.testTag("record-rename-title"))
                 Text("${date(current.startedAt)} · ${formatTime(current.durationMs)} · ${sessionStatus(current.state)}", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
                 if (current.audioPath != null && current.state !in listOf("PREPARING", "RECORDING", "PAUSED", "STOPPING")) {
-                    RecordingPlayback(current.audioPath)
+                    RecordingPlayback(current.audioPath) { ms, isPlaying ->
+                        playbackMs = ms
+                        playing = isPlaying
+                    }
                 }
                 DisplayModes(mode, { mode = it })
             }
             if (segments.isEmpty()) item { Text(tr("这场聆听没有已确认的文字。", "This session has no confirmed text."), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            items(groupedDetails, key = { it.sequence }) { segment ->
-                TranscriptParagraph(segment, mode, prefs.subtitleFontScale, retrying.contains(segment.sequence), model::copyText,
-                    onRetry = { model.retryTranslation(id, segment.sequence) }, canRetry = current.asrProvider != "doubao_ast")
+            items(visibleSegments, key = { it.sequence }) { segment ->
+                val rowContent: @Composable () -> Unit = {
+                    TranscriptParagraph(segment, mode, prefs.subtitleFontScale, retrying.contains(segment.sequence),
+                        model::copyText, onRetry = { model.retryTranslation(id, segment.sequence) },
+                        canRetry = current.asrProvider != "doubao_ast" && !editMode)
+                }
+                when {
+                    editMode -> Surface(
+                        onClick = {
+                            editingSegment = segment
+                            editOriginal = segment.original
+                            editTranslated = segment.translated.orEmpty()
+                        },
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = .08f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth().testTag("edit-segment-${segment.sequence}")
+                    ) {
+                        Column(Modifier.padding(10.dp)) {
+                            rowContent()
+                            Text(tr("点击修改这段文字", "Tap to edit text"),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    segment.sequence == playingSequence -> Surface(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = .15f),
+                        shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()
+                    ) { Box(Modifier.padding(10.dp)) { rowContent() } }
+                    else -> rowContent()
+                }
             }
         }
     }
     }
-    if (rename) AlertDialog(onDismissRequest = { rename = false }, title = { Text(tr("修改标题", "Rename record")) }, text = {
-        OutlinedTextField(title, { title = it.take(160) }, label = { Text(tr("标题", "Title")) }, modifier = Modifier.fillMaxWidth())
-    }, confirmButton = { TextButton(onClick = { model.renameSession(id, title); rename = false }, enabled = title.isNotBlank()) { Text(tr("保存", "Save")) } },
+    editingSegment?.let { segment ->
+        AlertDialog(onDismissRequest = { editingSegment = null },
+            title = { Text(tr("修改字幕", "Edit transcript")) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(editOriginal, { editOriginal = it.take(10_000) },
+                        label = { Text(tr("原文", "Original")) }, modifier = Modifier.fillMaxWidth(),
+                        minLines = 2, maxLines = 6)
+                    OutlinedTextField(editTranslated, { editTranslated = it.take(10_000) },
+                        label = { Text(tr("译文", "Translation")) }, modifier = Modifier.fillMaxWidth(),
+                        minLines = 2, maxLines = 6)
+                }
+            },
+            confirmButton = { TextButton(onClick = {
+                model.editSegmentContent(id, segment.sequence, editOriginal, editTranslated)
+                editingSegment = null
+            }, enabled = editOriginal.isNotBlank() || editTranslated.isNotBlank()) {
+                Text(tr("保存", "Save"))
+            } },
+            dismissButton = { TextButton(onClick = { editingSegment = null }) { Text(tr("取消", "Cancel")) } })
+    }
+    if (rename) AlertDialog(onDismissRequest = { rename = false },
+        title = { Text(tr("修改标题", "Rename record")) },
+        text = {
+            OutlinedTextField(value = titleInput, onValueChange = {
+                if (it.text.length <= 160) titleInput = it
+            }, label = { Text(tr("标题", "Title")) },
+                modifier = Modifier.fillMaxWidth().focusRequester(renameFocus),
+                minLines = 2, maxLines = 2)
+        },
+        confirmButton = { TextButton(onClick = {
+            model.renameSession(id, titleInput.text)
+            rename = false
+        }, enabled = titleInput.text.isNotBlank()) { Text(tr("保存", "Save")) } },
         dismissButton = { TextButton(onClick = { rename = false }) { Text(tr("取消", "Cancel")) } })
     if (delete) AlertDialog(onDismissRequest = { delete = false }, title = { Text(tr("删除这条记录？", "Delete this record?")) },
         text = { Text(tr("已保存的原文和译文将永久删除。导出的文件不受影响。", "Saved originals and translations will be permanently deleted. Exported documents are unaffected.")) },
@@ -461,7 +563,7 @@ internal val LocalReadingSurfaceAlpha = staticCompositionLocalOf { .20f }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RecordingPlayback(path: String) {
+private fun RecordingPlayback(path: String, onPlayback: (Int, Boolean) -> Unit = { _, _ -> }) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     var player by remember(path) { mutableStateOf<android.media.MediaPlayer?>(null) }
@@ -484,6 +586,7 @@ private fun RecordingPlayback(path: String) {
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer); player?.release(); player = null }
     }
+    LaunchedEffect(position, playing) { onPlayback(position, playing) }
     LaunchedEffect(player, playing) {
         while (playing) {
             val current = player ?: break
@@ -549,8 +652,8 @@ private fun RecordingPlayback(path: String) {
             modifier = Modifier.weight(1f).height(20.dp).testTag("recording-progress"),
             thumb = { Box(Modifier.size(9.dp).background(MaterialTheme.colorScheme.primary, CircleShape)) },
             track = { slider ->
-                SliderDefaults.Track(slider, modifier = Modifier.height(2.dp),
-                    thumbTrackGapSize = 0.dp, trackInsideCornerSize = 0.dp)
+                // Material slider owns track and thumb coordinates, preventing seek misalignment.
+                SliderDefaults.Track(slider, modifier = Modifier.height(3.dp))
             }
         )
     }
