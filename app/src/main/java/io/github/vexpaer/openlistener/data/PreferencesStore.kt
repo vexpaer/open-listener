@@ -16,6 +16,8 @@ data class AppPreferences(
     val appLanguage: String = "system",
     val theme: String = "system",
     val themeColor: Long = 0xFF406B88L,
+    val solidBackground: Boolean = false,
+    val notificationSubtitle: String = "original",
     val reducedMotion: Boolean = false,
     val subtitleFontScale: Float = 1f,
     val sourceLanguage: String = "en",
@@ -31,6 +33,8 @@ class PreferencesStore(private val context: Context) {
         val appLanguage = stringPreferencesKey("app_language")
         val theme = stringPreferencesKey("theme")
         val themeColor = stringPreferencesKey("theme_color")
+        val solidBackground = booleanPreferencesKey("solid_background")
+        val notificationSubtitle = stringPreferencesKey("notification_subtitle")
         val reducedMotion = booleanPreferencesKey("reduced_motion")
         val subtitleFontScale = floatPreferencesKey("subtitle_font_scale")
         val sourceLanguage = stringPreferencesKey("source_language")
@@ -46,6 +50,8 @@ class PreferencesStore(private val context: Context) {
             appLanguage = values[Keys.appLanguage] ?: "system",
             theme = values[Keys.theme] ?: "system",
             themeColor = values[Keys.themeColor]?.toLongOrNull() ?: 0xFF406B88L,
+            solidBackground = values[Keys.solidBackground] ?: false,
+            notificationSubtitle = values[Keys.notificationSubtitle]?.takeIf { it in setOf("original", "translation") } ?: "original",
             reducedMotion = values[Keys.reducedMotion] ?: false,
             subtitleFontScale = (values[Keys.subtitleFontScale] ?: 1f).coerceIn(.85f, 1.5f),
             sourceLanguage = values[Keys.sourceLanguage] ?: "en",
@@ -59,6 +65,11 @@ class PreferencesStore(private val context: Context) {
 
     suspend fun setRetainAudio(value: Boolean) = context.settingsDataStore.edit { it[Keys.retainAudio] = value }
     suspend fun setLocalAsrModel(value: String) = context.settingsDataStore.edit { it[Keys.localAsrModel] = value }
+    suspend fun setSolidBackground(value: Boolean) = context.settingsDataStore.edit { it[Keys.solidBackground] = value }
+    suspend fun setNotificationSubtitle(value: String) = context.settingsDataStore.edit {
+        require(value in setOf("original", "translation"))
+        it[Keys.notificationSubtitle] = value
+    }
     suspend fun setThemeColor(value: Long) = context.settingsDataStore.edit { it[Keys.themeColor] = value.toString() }
     suspend fun setTheme(value: String) = context.settingsDataStore.edit { it[Keys.theme] = value }
     suspend fun setReducedMotion(value: Boolean) = context.settingsDataStore.edit { it[Keys.reducedMotion] = value }
