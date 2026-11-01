@@ -90,7 +90,7 @@ class DoubaoSimultaneousAsr(
     }
     private class TransportFailure(message: String, val status: Int? = null) : IOException(message)
     private fun retryable(error: Throwable): Boolean =
-        error is TransportFailure && error.status == null
+        error is TransportFailure && (error.status == null || error.status in 500..599)
     override suspend fun prepare() = availability
     override suspend fun start(sessionId: String) = lifecycle.withLock {
         check(availability == EngineAvailability.Ready && appSession == null)
@@ -178,7 +178,7 @@ class DoubaoSimultaneousAsr(
             val request = DoubaoAuth.addHeaders(
                 Request.Builder().url(endpoint), credential(), legacyAppId(), legacyAccessKey(),
                 DoubaoAstProtocol.RESOURCE, legacyAppHeader = "X-Api-App-Id"
-            ).build()
+            ).header("X-Api-Request-Id", connection.id).build()
             val socket = client.newWebSocket(request, Listener(connection))
             synchronized(lock) { if (active === connection) connection.socket = socket else socket.cancel() }
             withTimeout(timeoutMs) {
