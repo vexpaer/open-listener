@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.13 · 2026-11-01
+
+- 20 秒背景运动周期，暖色调动态衬线排版，胡萝卜录音按钮与紧凑字幕切换。
+- 桌面小组件：实时字幕、开始／暂停／继续／停止控制，遵守 Android 麦克风前台启动要求。
+- 云端模型改为可新增、可选择、可编辑的加密配置列表，迁移原有云端凭据。
+- 版本进度与安装操作置于说明上方，简化通知并移除音量条。
+- 更细的录音时间轨道、无尾部时长；新记录不再使用 Lecture 前缀。
+
+
 ## 0.1.12 · 2026-11-01
 
 - Foreground notification displays the latest original or translated subtitles (user-selectable), an expanded audio meter and pause/resume/stop actions; duplicate app title removed.
