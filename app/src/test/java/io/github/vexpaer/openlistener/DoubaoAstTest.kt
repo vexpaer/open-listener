@@ -136,6 +136,9 @@ class DoubaoAstTest {
             }
         }))
         server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                webSocket.close(1000, "closed")
+            }
             var responded = false
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
                 when (fields(bytes.toByteArray())[2] as Long) {
