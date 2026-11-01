@@ -131,7 +131,7 @@ class DoubaoAstTest {
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
                 when (fields(bytes.toByteArray())[2] as Long) {
                     100L -> webSocket.send(response(150))
-                    200L -> webSocket.cancel()
+                    200L -> webSocket.close(1011, "simulate network failure")
                 }
             }
         }))
