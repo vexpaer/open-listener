@@ -111,6 +111,21 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
         app.cloudProfiles.update(entry, fields)
         reloadCloudProfiles()
     }
+    fun deleteCloudProfile(entry: CloudProfile) = editEnginePreference {
+        val remaining = app.cloudProfiles.delete(entry)
+        if (app.cloudProfiles.active(entry.kind) == remaining?.id || remaining == null) {
+            if (entry.kind == "asr") {
+                app.preferences.setProviders(remaining?.provider ?: "local", preferences.value.translationProvider)
+            } else {
+                app.preferences.setProviders(preferences.value.asrProvider, remaining?.provider ?: "mlkit")
+            }
+        }
+        reloadCloudProfiles()
+    }
+    fun selectLocalModel(id: String) = editEnginePreference {
+        app.preferences.setLocalAsrModel(id)
+        app.preferences.setProviders("local", preferences.value.translationProvider)
+    }
     val preferences = app.preferences.preferences.stateIn(viewModelScope, SharingStarted.Eagerly, AppPreferences())
     val serviceState = RecognitionRuntime.state
     val activeSessionId = RecognitionRuntime.sessionId
