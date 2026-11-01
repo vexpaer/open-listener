@@ -39,7 +39,7 @@ class SherpaStreamingAsr(
             ready -> EngineAvailability.Ready
             preparationError != null -> EngineAvailability.Unavailable(requireNotNull(preparationError))
             models.isInstalled(modelId) -> EngineAvailability.Ready
-            else -> EngineAvailability.NeedsDownload("Download the selected verified Zipformer model")
+            else -> EngineAvailability.NeedsDownload("Download the selected local streaming model")
         }
     private val output = Channel<TranscriptEvent>(Channel.RENDEZVOUS)
     override val events: Flow<TranscriptEvent> = output.receiveAsFlow()
