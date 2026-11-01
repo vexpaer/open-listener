@@ -435,9 +435,7 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
         } else ReadingSurface {
             val groupedDetails = if (current.asrProvider == "doubao_ast") SentenceGrouper.group(segments) else segments
             val visibleSegments = if (editMode) segments else groupedDetails
-            val currentIndex = if (playing && !editMode) visibleSegments.indexOfLast {
-                it.startOffsetMs <= playbackMs.toLong()
-            } else -1
+            val currentIndex = if (playing && !editMode) io.github.vexpaer.openlistener.data.AudioSubtitleSync.activeIndex(visibleSegments, playbackMs.toLong()) else -1
             val playingSequence = visibleSegments.getOrNull(currentIndex)?.sequence
             LaunchedEffect(playing, playingSequence, editMode) {
                 if (playing && currentIndex >= 0 && !editMode) {
