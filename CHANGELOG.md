@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.15 · 2026-11-02
+
+- Model selections now use square theme-colored checkboxes for local speech and saved cloud profiles.
+- Cloud account editing supports confirmed encrypted credential removal and safe selection fallback; fixes pink selected backgrounds and duplicate plus signs.
+- Local model downloads move into the overflow menu; installed checkmarks follow the installed label.
+- Dark-mode introduction uses white text, and the carrot button is slightly lighter.
+- Saved transcript editing now happens directly on the detail page with contextual Save/Discard buttons.
+- Playback seek knob and rail now share one Canvas centerline with a tested seek-coordinate transform.
+
+
 ## 0.1.14 · 2026-11-02
 
 - 播放录音时字幕自动跟随并高亮；详情页新增正文编辑模式，标题点击即进入两行自动选中重命名。

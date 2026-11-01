@@ -48,6 +48,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
     val languageBusy by model.languageBusy.collectAsState()
     val modelStates by model.modelStates.collectAsState()
     val cloudProfiles by model.cloudProfiles.collectAsState()
+    val activeCloudProfiles by model.activeCloudProfiles.collectAsState()
     val editingAllowed = !state.isSessionActive()
     val list = rememberLazyListState()
     var guideFor by rememberSaveable { mutableStateOf<String?>(null) }
@@ -56,6 +57,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
     var newCloudKind by rememberSaveable { mutableStateOf<String?>(null) }
     var newCloudProvider by rememberSaveable { mutableStateOf<String?>(null) }
     var editingCloudProfile by remember { mutableStateOf<CloudProfile?>(null) }
+    var deletingCloudProfile by remember { mutableStateOf<CloudProfile?>(null) }
     var deleteLanguage by rememberSaveable { mutableStateOf<String?>(null) }
     var deleteModel by rememberSaveable { mutableStateOf<String?>(null) }
     var font by remember(prefs.subtitleFontScale) { mutableFloatStateOf(prefs.subtitleFontScale) }
@@ -214,29 +216,47 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
                                             val phase = status?.phase ?: ModelPhase.NOT_INSTALLED
                                             var more by remember { mutableStateOf(false) }
                                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                                Checkbox(
+                                                    checked = phase == ModelPhase.INSTALLED &&
+                                                        prefs.asrProvider == "local" && prefs.localAsrModel == manifest.id,
+                                                    onCheckedChange = { if (it) model.selectLocalModel(manifest.id) },
+                                                    enabled = editingAllowed && phase == ModelPhase.INSTALLED,
+                                                    modifier = Modifier.size(44.dp).testTag("select-model-${manifest.id}"),
+                                                    colors = CheckboxDefaults.colors(
+                                                        checkedColor = MaterialTheme.colorScheme.primary,
+                                                        uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant))
                                                 Column(Modifier.weight(1f)) {
-                                                    Text(manifest.displayName.replace(" (INT8)", ""), style = MaterialTheme.typography.titleSmall)
-                                                    Text("${bytes(manifest.bytes)} · ${phaseLabel(phase)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                }
-                                                if (phase == ModelPhase.INSTALLED) {
-                                                    IconButton(onClick = { model.setLocalAsrModel(manifest.id) }, enabled = editingAllowed,
-                                                        modifier = Modifier.testTag("select-model-${manifest.id}")) {
-                                                        Icon(if (prefs.localAsrModel == manifest.id) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
-                                                            tr("选择模型", "Select model"), tint = MaterialTheme.colorScheme.primary)
-                                                    }
-                                                } else if (phase in listOf(ModelPhase.NOT_INSTALLED, ModelPhase.ERROR)) {
-                                                    IconButton(onClick = { model.downloadModel(manifest.id) }, enabled = editingAllowed,
-                                                        modifier = Modifier.testTag("download-asr-model-${manifest.id}")) {
-                                                        Icon(Icons.Outlined.Download, tr("下载模型", "Download model"), tint = MaterialTheme.colorScheme.primary)
+                                                    Text(manifest.displayName.replace(" (INT8)", ""),
+                                                        style = MaterialTheme.typography.titleSmall)
+                                                    Row(verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                                        Text("${bytes(manifest.bytes)} · ${phaseLabel(phase)}",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        if (phase == ModelPhase.INSTALLED)
+                                                            Icon(Icons.Outlined.CheckCircle, null,
+                                                                Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                                                     }
                                                 }
                                                 Box {
-                                                    IconButton(onClick = { more = true }) { Icon(Icons.Outlined.MoreHoriz, tr("模型选项", "Model options")) }
+                                                    IconButton(onClick = { more = true }) {
+                                                        Icon(Icons.Outlined.MoreHoriz, tr("模型选项", "Model options"))
+                                                    }
                                                     DropdownMenu(more, { more = false }) {
-                                                        DropdownMenuItem(text = { Text(tr("来源", "Source")) }, onClick = { more = false; model.openUrl(manifest.sourceUrl) })
-                                                        DropdownMenuItem(text = { Text(tr("许可证", "License")) }, onClick = { more = false; model.openUrl(manifest.licenseUrl) })
-                                                        if (phase == ModelPhase.INSTALLED) DropdownMenuItem(text = { Text(tr("删除模型", "Delete model")) },
-                                                            enabled = editingAllowed && status?.inUse != true, onClick = { more = false; deleteModel = manifest.id })
+                                                        if (phase in listOf(ModelPhase.NOT_INSTALLED, ModelPhase.ERROR))
+                                                            DropdownMenuItem(text = { Text(tr("下载模型", "Download model")) },
+                                                                enabled = editingAllowed, onClick = {
+                                                                    more = false
+                                                                    model.downloadModel(manifest.id)
+                                                                }, modifier = Modifier.testTag("download-asr-model-${manifest.id}"))
+                                                        DropdownMenuItem(text = { Text(tr("来源", "Source")) },
+                                                            onClick = { more = false; model.openUrl(manifest.sourceUrl) })
+                                                        DropdownMenuItem(text = { Text(tr("许可证", "License")) },
+                                                            onClick = { more = false; model.openUrl(manifest.licenseUrl) })
+                                                        if (phase == ModelPhase.INSTALLED)
+                                                            DropdownMenuItem(text = { Text(tr("删除模型", "Delete model")) },
+                                                                enabled = editingAllowed && status?.inUse != true,
+                                                                onClick = { more = false; deleteModel = manifest.id })
                                                     }
                                                 }
                                             }
@@ -254,16 +274,10 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
                                     }
                                 }
                             }
-                            item {
-                                OutlinedButton(onClick = model::checkSelectedEngines, enabled = !check.busy) {
-                                    Text(if (check.busy) tr("检查中…", "Checking…") else tr("检查配置", "Check setup"))
-                                }
-                                check.detail?.let { Hint(it) }
-                            }
                         }
                         "asr-cloud" -> item {
                             CloudProfilePanel("asr", cloudProfiles.filter { it.kind == "asr" },
-                                model.activeCloudProfile("asr"), editingAllowed,
+                                activeCloudProfiles["asr"]?.takeIf { prefs.asrProvider != "local" }, editingAllowed,
                                 onSelect = model::selectCloudProfile,
                                 onAdd = { chooseCloudKind = "asr" },
                                 onEdit = { editingCloudProfile = it })
@@ -297,7 +311,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
                         }
                         "translation-cloud" -> item {
                             CloudProfilePanel("translation", cloudProfiles.filter { it.kind == "translation" },
-                                model.activeCloudProfile("translation"), editingAllowed,
+                                activeCloudProfiles["translation"]?.takeIf { prefs.translationProvider != "mlkit" }, editingAllowed,
                                 onSelect = model::selectCloudProfile,
                                 onAdd = { chooseCloudKind = "translation" },
                                 onEdit = { editingCloudProfile = it })
@@ -349,7 +363,13 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
             onHelp = { guideFor = providerKey },
             onDismiss = { editingCloudProfile = null },
             onSaved = { fields -> model.updateCloudProfile(profile, fields) },
-            editing = profile)
+            editing = profile, onDelete = { deletingCloudProfile = profile; editingCloudProfile = null })
+    }
+    deletingCloudProfile?.let { profile ->
+        ConfirmDelete(tr("删除云端配置？", "Delete cloud configuration?"),
+            tr("此配置的 API 凭据也将从设备删除。", "The saved API credentials will also be deleted."),
+            onDismiss = { deletingCloudProfile = null },
+            onConfirm = { model.deleteCloudProfile(profile); deletingCloudProfile = null })
     }
     if (showColorPicker) ThemeColorPicker(prefs.themeColor,
         onDismiss = { showColorPicker = false },
@@ -377,13 +397,25 @@ private fun CloudProfilePanel(kind: String, profiles: List<CloudProfile>, select
         profiles.forEach { profile ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterChip(selected = selected == profile.id,
+                Surface(
                     onClick = { onSelect(profile) }, enabled = enabled,
                     modifier = Modifier.weight(1f).testTag("$kind-profile-${profile.id}"),
-                    label = {
+                    color = if (selected == profile.id) MaterialTheme.colorScheme.primary.copy(alpha = .12f)
+                        else Color.Transparent,
+                    shape = RoundedCornerShape(10.dp)) {
+                    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = selected == profile.id,
+                            onCheckedChange = null, enabled = enabled,
+                            modifier = Modifier.size(36.dp),
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = MaterialTheme.colorScheme.primary,
+                                uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant))
                         Text(profile.label, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                    })
+                            modifier = Modifier.weight(1f).padding(start = 6.dp),
+                            style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
                 IconButton(onClick = { onEdit(profile) }, enabled = enabled) {
                     Icon(Icons.Outlined.Edit, tr("编辑", "Edit"))
                 }
@@ -392,8 +424,8 @@ private fun CloudProfilePanel(kind: String, profiles: List<CloudProfile>, select
         OutlinedButton(onClick = onAdd, enabled = enabled,
             modifier = Modifier.fillMaxWidth().testTag("$kind-add-cloud-profile")) {
             Icon(Icons.Outlined.Add, null)
-            Text(if (profiles.isEmpty()) "  +  " else "  ")
-            if (profiles.isNotEmpty()) Text(tr("添加配置", "Add configuration"))
+            Spacer(Modifier.width(7.dp))
+            Text(tr("添加配置", "Add configuration"))
         }
     }
 }
@@ -401,7 +433,7 @@ private fun CloudProfilePanel(kind: String, profiles: List<CloudProfile>, select
 @Composable
 private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, enabled: Boolean, onHelp: () -> Unit,
                               onDismiss: () -> Unit, onSaved: ((Map<String, String>) -> Unit)? = null,
-                              editing: CloudProfile? = null) {
+                              editing: CloudProfile? = null, onDelete: (() -> Unit)? = null) {
     val asr = provider == "doubao"
     val ast = provider == "doubao_ast"
     val supportsLegacyAuth = asr || ast
@@ -421,15 +453,15 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
         }
     }
     // Deliberately not rememberSaveable: secrets must never enter Activity saved-state bundles.
-    var key by remember(provider) { mutableStateOf(existing("api_key").ifBlank { if (ast && onSaved == null) model.credential("doubao", "api_key") else "" }) }
-    var appId by remember(provider) { mutableStateOf(existing("app_id").ifBlank { if (ast && onSaved == null) model.credential("doubao", "app_id") else "" }) }
-    var accessKey by remember(provider) { mutableStateOf(existing("access_key").ifBlank { if (ast && onSaved == null) model.credential("doubao", "access_key") else "" }) }
-    var legacyAuth by remember(provider) {
+    var key by remember(provider, editing?.id, onSaved != null) { mutableStateOf(existing("api_key").ifBlank { if (ast && onSaved == null) model.credential("doubao", "api_key") else "" }) }
+    var appId by remember(provider, editing?.id, onSaved != null) { mutableStateOf(existing("app_id").ifBlank { if (ast && onSaved == null) model.credential("doubao", "app_id") else "" }) }
+    var accessKey by remember(provider, editing?.id, onSaved != null) { mutableStateOf(existing("access_key").ifBlank { if (ast && onSaved == null) model.credential("doubao", "access_key") else "" }) }
+    var legacyAuth by remember(provider, editing?.id, onSaved != null) {
         mutableStateOf(appId.isNotBlank() || accessKey.isNotBlank())
     }
-    var resource by remember(provider) { mutableStateOf(existing("resource_id")) }
-    var base by remember(provider) { mutableStateOf(existing("base_url").ifBlank { defaultBase }) }
-    var modelId by remember(provider) { mutableStateOf(existing("model").ifBlank { defaultModel }) }
+    var resource by remember(provider, editing?.id, onSaved != null) { mutableStateOf(existing("resource_id")) }
+    var base by remember(provider, editing?.id, onSaved != null) { mutableStateOf(existing("base_url").ifBlank { defaultBase }) }
+    var modelId by remember(provider, editing?.id, onSaved != null) { mutableStateOf(existing("model").ifBlank { defaultModel }) }
     val authValid = if (!supportsLegacyAuth || !legacyAuth) key.isNotBlank() else appId.isNotBlank() && accessKey.isNotBlank()
     val valid = authValid && if (asr) resource.isNotBlank() else if (ast) true else base.startsWith("https://") && modelId.isNotBlank()
     val clearAuth = key.isBlank() && appId.isBlank() && accessKey.isBlank()
@@ -478,8 +510,15 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
                 if (onSaved != null) onSaved(fields) else model.saveCredentials(provider, fields)
                 onDismiss()
                 if (onSaved == null) model.checkSelectedEngines()
-            }, enabled = enabled && if (onSaved != null) valid else valid || clearAuth) { Text(tr("加密保存", "Save encrypted")) }
-        }, dismissButton = { TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) } })
+            }, enabled = enabled && if (onSaved != null) valid else valid || clearAuth) { Text(tr("保存", "Save")) }
+        }, dismissButton = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (onDelete != null) TextButton(onClick = onDelete, enabled = enabled) {
+                    Text(tr("删除配置", "Delete"), color = MaterialTheme.colorScheme.error)
+                }
+                TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) }
+            }
+        })
 }
 
 @Composable

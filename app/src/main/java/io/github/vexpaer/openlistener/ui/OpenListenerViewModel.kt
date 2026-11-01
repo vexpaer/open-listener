@@ -89,10 +89,18 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
     val notice = _notice.asStateFlow()
     private val _cloudProfiles = MutableStateFlow<List<CloudProfile>>(emptyList())
     val cloudProfiles = _cloudProfiles.asStateFlow()
+    private val _activeCloudProfiles = MutableStateFlow<Map<String, String?>>(emptyMap())
+    val activeCloudProfiles = _activeCloudProfiles.asStateFlow()
     fun activeCloudProfile(kind: String): String? = app.cloudProfiles.active(kind)
     fun profileCredential(profile: CloudProfile, field: String) = app.credentials.get("cloud_profile_${profile.id}", field).orEmpty()
     private fun reloadCloudProfiles() {
         _cloudProfiles.value = app.cloudProfiles.list("asr") + app.cloudProfiles.list("translation")
+        // A profile switch can keep the same provider and identical list content.
+        // Emit selected IDs separately so the checkboxes still update immediately.
+        _activeCloudProfiles.value = mapOf(
+            "asr" to app.cloudProfiles.active("asr"),
+            "translation" to app.cloudProfiles.active("translation")
+        )
     }
     fun addCloudProfile(kind: String, provider: String, fields: Map<String, String>) = viewModelScope.launch {
         val entry = app.cloudProfiles.add(kind, provider, fields)
@@ -110,6 +118,22 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
     fun updateCloudProfile(entry: CloudProfile, fields: Map<String, String>) = editEnginePreference {
         app.cloudProfiles.update(entry, fields)
         reloadCloudProfiles()
+    }
+    fun deleteCloudProfile(entry: CloudProfile) = editEnginePreference {
+        val deletingActive = app.cloudProfiles.active(entry.kind) == entry.id
+        val remaining = app.cloudProfiles.delete(entry)
+        if (deletingActive) {
+            if (entry.kind == "asr") {
+                app.preferences.setProviders(remaining?.provider ?: "local", preferences.value.translationProvider)
+            } else {
+                app.preferences.setProviders(preferences.value.asrProvider, remaining?.provider ?: "mlkit")
+            }
+        }
+        reloadCloudProfiles()
+    }
+    fun selectLocalModel(id: String) = editEnginePreference {
+        app.preferences.setLocalAsrModel(id)
+        app.preferences.setProviders("local", preferences.value.translationProvider)
     }
     val preferences = app.preferences.preferences.stateIn(viewModelScope, SharingStarted.Eagerly, AppPreferences())
     val serviceState = RecognitionRuntime.state
