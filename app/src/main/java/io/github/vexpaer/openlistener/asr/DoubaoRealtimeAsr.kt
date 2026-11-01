@@ -86,8 +86,9 @@ class DoubaoRealtimeAsr(
     )
 
     override val availability: EngineAvailability
-        get() = if (credential("api_key").isNullOrBlank() || credential("resource_id").isNullOrBlank()) {
-            EngineAvailability.NeedsCredentials("请配置豆包 X-Api-Key 和 X-Api-Resource-Id。")
+        get() = if (!DoubaoAuth.hasCredentials(credential("api_key"), credential("app_id"), credential("access_key")) ||
+            credential("resource_id").isNullOrBlank()) {
+            EngineAvailability.NeedsCredentials("请配置豆包 API Key，或旧版控制台的 App Key 与 Access Token，并填写 Resource ID。")
         } else EngineAvailability.Ready
 
     // Local validation only. start() performs the authenticated WebSocket handshake and ACK wait.
@@ -117,12 +118,11 @@ class DoubaoRealtimeAsr(
             Connection(UUID.randomUUID().toString(), audioBytes / 32).also { connection = it }
         }
         try {
-            val request = Request.Builder()
-                .url(endpoint)
-                .header("X-Api-Key", credential("api_key")!!)
-                .header("X-Api-Resource-Id", credential("resource_id")!!)
-                .header("X-Api-Request-Id", stream.requestId)
-                .build()
+            val request = DoubaoAuth.addHeaders(
+                Request.Builder().url(endpoint),
+                credential("api_key"), credential("app_id"), credential("access_key"),
+                checkNotNull(credential("resource_id")), legacyAppHeader = "X-Api-App-Key"
+            ).header("X-Api-Request-Id", stream.requestId).build()
             val webSocket = client.newWebSocket(request, Listener(stream))
             synchronized(lock) {
                 if (connection === stream && stream.failure == null) stream.socket = webSocket
@@ -379,15 +379,17 @@ class DoubaoRealtimeAsr(
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             val status = response?.code
+            val logId = response?.header("X-Tt-Logid")
             response?.close()
+            val kind = when {
+                status == 401 || status == 403 -> DoubaoAsrErrorKind.AUTHENTICATION
+                status != null -> DoubaoAsrErrorKind.SERVER
+                else -> DoubaoAsrErrorKind.NETWORK
+            }
             fail(stream, DoubaoAsrException(
-                if (status == 401 || status == 403) DoubaoAsrErrorKind.AUTHENTICATION else DoubaoAsrErrorKind.NETWORK,
-                when (status) {
-                    401, 403 -> "豆包鉴权失败（HTTP $status），请检查 Key 和 Resource ID。"
-                    429 -> "豆包请求受限（HTTP 429），请检查配额与并发额度。"
-                    null -> "豆包网络连接中断；丢失音频不会被重放。"
-                    else -> "豆包握手失败（HTTP $status）。"
-                },
+                kind,
+                if (status == null) "豆包网络连接中断；丢失音频不会被重放。"
+                    else DoubaoAuth.handshakeError("豆包实时语音", status, logId),
                 httpStatus = status, requestId = stream.requestId
             ))
         }

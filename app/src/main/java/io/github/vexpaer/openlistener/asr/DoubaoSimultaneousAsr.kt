@@ -28,15 +28,20 @@ class DoubaoSimultaneousAsr(
     private val client: OkHttpClient = OkHttpClient.Builder().pingInterval(20, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.MILLISECONDS).retryOnConnectionFailure(false).build(),
     private val endpoint: String = DoubaoAstProtocol.ENDPOINT,
-    private val timeoutMs: Long = 15000
+    private val timeoutMs: Long = 15000,
+    private val legacyAppId: () -> String? = { null },
+    private val legacyAccessKey: () -> String? = { null }
 ) : AsrEngine {
     constructor(credentials: CredentialsStore, source: String, target: String) : this(
-        { credentials.get("doubao_ast", "api_key") }, source, target)
+        { credentials.get("doubao_ast", "api_key") }, source, target,
+        legacyAppId = { credentials.get("doubao_ast", "app_id") },
+        legacyAccessKey = { credentials.get("doubao_ast", "access_key") })
     override val capabilities = AsrCapabilities("doubao-ast-v2", "Doubao simultaneous translation · S2T", true,
         setOf("zh-CN", "en", "ja", "ko", "fr", "de", "es"), true, providesTranslation = true)
     override val availability: EngineAvailability get() = when {
         closed -> EngineAvailability.Unavailable("豆包同传已关闭。")
-        credential().isNullOrBlank() -> EngineAvailability.NeedsCredentials("请配置豆包同声传译 API Key，并开通同传服务。")
+        !DoubaoAuth.hasCredentials(credential(), legacyAppId(), legacyAccessKey()) ->
+            EngineAvailability.NeedsCredentials("请配置豆包同声传译 API Key，或旧版控制台的 App ID 与 Access Token。")
         DoubaoAstProtocol.language(source) !in languages || DoubaoAstProtocol.language(target) !in languages ->
             EngineAvailability.Unavailable("豆包同传不支持所选语言。")
         DoubaoAstProtocol.language(source) !in setOf("zh", "en") && DoubaoAstProtocol.language(target) !in setOf("zh", "en") ->
@@ -74,8 +79,10 @@ class DoubaoSimultaneousAsr(
     private suspend fun connect() {
         val connection = synchronized(lock) { Connection().also { active = it } }
         try {
-            val request = Request.Builder().url(endpoint).header("X-Api-Key", checkNotNull(credential()))
-                .header("X-Api-Resource-Id", DoubaoAstProtocol.RESOURCE).build()
+            val request = DoubaoAuth.addHeaders(
+                Request.Builder().url(endpoint), credential(), legacyAppId(), legacyAccessKey(),
+                DoubaoAstProtocol.RESOURCE, legacyAppHeader = "X-Api-App-Id"
+            ).build()
             val socket = client.newWebSocket(request, Listener(connection))
             synchronized(lock) { if (active === connection) connection.socket = socket else socket.cancel() }
             withTimeout(timeoutMs) {
@@ -169,7 +176,11 @@ class DoubaoSimultaneousAsr(
         }
         override fun onMessage(webSocket: WebSocket, text: String) { fail(connection, IOException("豆包同传返回了不支持的数据格式。")) }
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-            fail(connection, IOException("豆包同传连接中断${response?.code?.let { " (HTTP $it)" }.orEmpty()}，请检查网络与服务权限。"))
+            val status = response?.code
+            val error = if (status == null) IOException("豆包同传网络连接中断，请检查网络或服务地址。")
+                else IOException(DoubaoAuth.handshakeError("豆包同传", status, response.header("X-Tt-Logid")))
+            response?.close()
+            fail(connection, error)
         }
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
             if (!connection.finished.isCompleted) fail(connection, IOException("豆包同传连接在最终字幕确认前关闭。"))
