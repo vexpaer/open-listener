@@ -68,7 +68,8 @@ data class UpdateUiState(
 )
 
 data class EngineCheck(val busy: Boolean = false, val ready: Boolean = false, val detail: String? = null,
-                       val missingSpeech: Boolean = false, val missingTranslation: Boolean = false)
+                       val missingSpeech: Boolean = false, val missingTranslation: Boolean = false,
+                       val checked: Boolean = false)
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
 class OpenListenerViewModel(application: Application) : AndroidViewModel(application) {
@@ -158,6 +159,7 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
         if (id == null) flowOf(emptyList()) else repository.observeSegments(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private val _engineCheck = MutableStateFlow(EngineCheck())
+    private var checkJob: Job? = null
     val engineCheck = _engineCheck.asStateFlow()
     private val _updates = MutableStateFlow(UpdateUiState())
     val updates = _updates.asStateFlow()
@@ -245,7 +247,11 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
     private fun editEnginePreference(block: suspend () -> Unit) {
         if (serviceState.value.isSessionActive()) {
             notify("请先结束当前聆听，再切换引擎或语言。", "End the current session before changing engines or languages.")
-        } else editPreference { block(); _engineCheck.value = EngineCheck() }
+        } else editPreference {
+            block()
+            _engineCheck.value = EngineCheck()
+            checkSelectedEngines()
+        }
     }
 
     fun credential(provider: String, field: String): String = app.credentials.get(provider, field).orEmpty()
@@ -256,28 +262,52 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
                 if (value.isBlank()) app.credentials.remove(provider, field) else app.credentials.set(provider, field, value.trim())
             }
             _engineCheck.value = EngineCheck()
+            checkSelectedEngines()
             notify("配置已加密保存在本机；不会自动切换服务商。", "Configuration is encrypted on this device. No provider fallback is used.")
         } catch (error: Exception) { showError(error) }
     }
+    /**
+     * Latest-wins health check. Configuring a provider can trigger multiple state
+     * emissions; older checks must never overwrite the current selection.
+     * Transient query failures are not equivalent to missing configuration.
+     */
     fun checkSelectedEngines() {
-        if (_engineCheck.value.busy) return
-        viewModelScope.launch {
-            _engineCheck.value = EngineCheck(busy = true)
+        checkJob?.cancel()
+        checkJob = viewModelScope.launch {
+            val last = _engineCheck.value
+            _engineCheck.value = last.copy(busy = true)
             try {
-                val speech = app.newAsr(preferences.value)
-                val translation = if (speech.capabilities.providesTranslation) null else app.newTranslator(preferences.value)
+                val prefs = app.preferences.preferences.first()
+                val speech = app.newAsr(prefs)
+                val translation = if (speech.capabilities.providesTranslation) null else app.newTranslator(prefs)
                 var speechStatus: EngineAvailability = EngineAvailability.Ready
                 var translationStatus: EngineAvailability = EngineAvailability.Ready
                 try {
                     speechStatus = speech.availability
                     translationStatus = translation?.prepare() ?: EngineAvailability.Ready
-                } finally { speech.close(); translation?.close() }
+                } finally {
+                    speech.close()
+                    translation?.close()
+                }
+                val speechMissing = speechStatus is EngineAvailability.NeedsDownload ||
+                    speechStatus is EngineAvailability.NeedsCredentials
+                val translationMissing = translationStatus is EngineAvailability.NeedsDownload ||
+                    translationStatus is EngineAvailability.NeedsCredentials
                 val result = if (speechStatus !is EngineAvailability.Ready) speechStatus else translationStatus
-                _engineCheck.value = EngineCheck(ready = result is EngineAvailability.Ready,
-                    missingSpeech = speechStatus !is EngineAvailability.Ready,
-                    missingTranslation = translationStatus !is EngineAvailability.Ready,
-                    detail = result.detailOrNull() ?: if (speech.capabilities.providesTranslation) text("豆包同传已配置，可直接生成双语字幕。", "Doubao AST is configured for bilingual subtitles.") else text("所选引擎与语言包已就绪。", "Selected engines and language models are ready."))
-            } catch (error: Exception) { _engineCheck.value = EngineCheck(detail = error.message); showError(error) }
+                _engineCheck.value = EngineCheck(
+                    ready = result is EngineAvailability.Ready,
+                    checked = true,
+                    missingSpeech = speechMissing,
+                    missingTranslation = translationMissing,
+                    detail = result.detailOrNull()
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _engineCheck.value = last.copy(busy = false, checked = false,
+                    detail = error.message ?: text("模型检查暂时不可用", "Model check temporarily unavailable"))
+                // Do not show a configuration-needed banner for a transient SDK/network failure.
+            }
         }
     }
 
@@ -514,6 +544,7 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
         }
     }
     fun onActivityResumed() {
+        checkSelectedEngines()
         if (awaitingInstallPermission && updater.canRequestPackageInstalls()) {
             awaitingInstallPermission = false
             installUpdate()
