@@ -18,11 +18,15 @@
         <TextView android:id="@+id/widget_state" android:layout_width="0dp"
             android:layout_height="wrap_content" android:layout_weight="1"
             android:text="Ready" android:textSize="12sp" android:textColor="#4B6478" />
-        <Button android:id="@+id/widget_primary" android:layout_width="wrap_content"
-            android:layout_height="44dp" android:minWidth="80dp" android:text="Start"
-            android:textSize="13sp" android:textAllCaps="false" />
-        <Button android:id="@+id/widget_stop" android:layout_width="wrap_content"
-            android:layout_height="44dp" android:minWidth="68dp" android:text="Stop"
-            android:textSize="13sp" android:textAllCaps="false" />
+        <ImageView android:id="@+id/widget_primary" android:layout_width="44dp"
+            android:layout_height="44dp" android:layout_marginEnd="10dp"
+            android:background="@drawable/widget_action_background"
+            android:padding="11dp" android:src="@drawable/ic_widget_play"
+            android:contentDescription="Start or pause recording" />
+        <ImageView android:id="@+id/widget_stop" android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/widget_action_background"
+            android:padding="12dp" android:src="@drawable/ic_widget_stop"
+            android:contentDescription="Stop recording" />
     </LinearLayout>
 </LinearLayout>

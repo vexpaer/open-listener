@@ -67,7 +67,8 @@ data class UpdateUiState(
     val error: String? = null
 )
 
-data class EngineCheck(val busy: Boolean = false, val ready: Boolean = false, val detail: String? = null)
+data class EngineCheck(val busy: Boolean = false, val ready: Boolean = false, val detail: String? = null,
+                       val missingSpeech: Boolean = false, val missingTranslation: Boolean = false)
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
 class OpenListenerViewModel(application: Application) : AndroidViewModel(application) {
@@ -241,11 +242,16 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
             try {
                 val speech = app.newAsr(preferences.value)
                 val translation = if (speech.capabilities.providesTranslation) null else app.newTranslator(preferences.value)
-                val result = try {
-                    val asr = speech.availability
-                    if (asr !is EngineAvailability.Ready) asr else translation?.prepare() ?: EngineAvailability.Ready
+                var speechStatus: EngineAvailability = EngineAvailability.Ready
+                var translationStatus: EngineAvailability = EngineAvailability.Ready
+                try {
+                    speechStatus = speech.availability
+                    translationStatus = translation?.prepare() ?: EngineAvailability.Ready
                 } finally { speech.close(); translation?.close() }
+                val result = if (speechStatus !is EngineAvailability.Ready) speechStatus else translationStatus
                 _engineCheck.value = EngineCheck(ready = result is EngineAvailability.Ready,
+                    missingSpeech = speechStatus !is EngineAvailability.Ready,
+                    missingTranslation = translationStatus !is EngineAvailability.Ready,
                     detail = result.detailOrNull() ?: if (speech.capabilities.providesTranslation) text("豆包同传已配置，可直接生成双语字幕。", "Doubao AST is configured for bilingual subtitles.") else text("所选引擎与语言包已就绪。", "Selected engines and language models are ready."))
             } catch (error: Exception) { _engineCheck.value = EngineCheck(detail = error.message); showError(error) }
         }
@@ -296,6 +302,14 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
         val clean = title.trim().take(160)
         if (clean.isEmpty()) return@launch
         try { repository.renameSession(id, clean) } catch (error: Exception) { showError(error) }
+    }
+    fun editSegmentContent(sessionId: String, sequence: Long, original: String, translated: String?) = viewModelScope.launch {
+        if (sessionId == activeSessionId.value && serviceState.value.isSessionActive()) {
+            notify("录音期间不可编辑字幕。", "Finish recording before editing subtitles.")
+            return@launch
+        }
+        try { repository.editSegment(sessionId, sequence, original, translated) }
+        catch (error: Exception) { showError(error) }
     }
     fun deleteSession(id: String) = viewModelScope.launch {
         if (id == activeSessionId.value && serviceState.value.isSessionActive()) {

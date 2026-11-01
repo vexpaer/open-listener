@@ -87,6 +87,7 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
         val scope = rememberCoroutineScope()
         val selected = if (route.startsWith("detail")) 1 else pager.currentPage
         val notice by viewModel.notice.collectAsState()
+        var pendingSettingsPanel by remember { mutableStateOf<String?>(null) }
         val snackbar = remember { SnackbarHostState() }
         var entered by rememberSaveable { mutableStateOf(false) }
         val entrance by animateFloatAsState(if (entered || !motion) 1f else .4f, tween(if (motion) 550 else 0), label = "first-open")
@@ -136,9 +137,13 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
                             HorizontalPager(state = pager, beyondViewportPageCount = 2, pageSpacing = 12.dp,
                                 modifier = Modifier.fillMaxSize().testTag("main-pager")) { page ->
                                 when (page) {
-                                    0 -> ListenPage(viewModel, foreground && pager.currentPage == 0, onSettings = { navigateTop("settings") })
+                                    0 -> ListenPage(viewModel, foreground && pager.currentPage == 0, onSettings = { panel ->
+                                        pendingSettingsPanel = panel
+                                        navigateTop("settings")
+                                    })
                                     1 -> LibraryPage(viewModel) { id -> nav.navigate("detail/$id") }
-                                    2 -> SettingsPage(viewModel, active = pager.currentPage == 2)
+                                    2 -> SettingsPage(viewModel, active = pager.currentPage == 2,
+                                        openPanel = pendingSettingsPanel, onPanelOpened = { pendingSettingsPanel = null })
                                 }
                             }
                         }

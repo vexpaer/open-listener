@@ -3,6 +3,7 @@ package io.github.vexpaer.openlistener.ui.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -114,6 +115,9 @@ fun OpenListenerTheme(themeMode: String, reducedMotion: Boolean, themeColor: Lon
             labelLarge = EditorialTypography.labelLarge.copy(fontFamily = font),
             labelMedium = EditorialTypography.labelMedium.copy(fontFamily = font),
             labelSmall = EditorialTypography.labelSmall.copy(fontFamily = font))
-        MaterialTheme(colorScheme = scheme, typography = type, content = content)
+        MaterialTheme(colorScheme = scheme, typography = type) {
+            // Text without an explicit Material typography style also inherits the warm serif.
+            CompositionLocalProvider(LocalTextStyle provides TextStyle(fontFamily = font), content = content)
+        }
     }
 }
