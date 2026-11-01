@@ -83,6 +83,22 @@ class CloudProfileStore(private val credentials: CredentialsStore) {
         })
         activate(entry)
     }
+    /** Remove a profile and its encrypted secrets; restore a remaining valid selection. */
+    @Synchronized fun delete(entry: CloudProfile): CloudProfile? {
+        val existing = list(entry.kind)
+        require(existing.any { it.id == entry.id && it.provider == entry.provider })
+        val remaining = existing.filterNot { it.id == entry.id }
+        val wasActive = active(entry.kind) == entry.id
+        persist(entry.kind, remaining)
+        fields.forEach { field -> credentials.remove("cloud_profile_${entry.id}", field) }
+        if (!wasActive) return remaining.find { it.id == active(entry.kind) }
+        credentials.remove("cloud_profiles", "active_${entry.kind}")
+        // The legacy canonical fields also feed the engines. Never leave revoked API keys there.
+        val canonicalKey = canonical(entry.kind, entry.provider)
+        fields.forEach { field -> credentials.remove(canonicalKey, field) }
+        return remaining.firstOrNull()?.also { activate(it) }
+    }
+
     private fun persist(kind: String, entries: List<CloudProfile>) {
         val array = JSONArray()
         entries.forEach { array.put(JSONObject().put("id", it.id).put("provider", it.provider).put("label", it.label)) }
