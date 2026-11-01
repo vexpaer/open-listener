@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.16 · 2026-11-02
+
+- Correct stale "configure models" banners: latest-wins preflight, explicit checked status, retry on preference/credential changes and foreground resume.
+- Add checksum-pinned SenseVoice Small INT8, X-ASR 480 ms INT8 with punctuation, and Moonshine v2 English Tiny/Base.
+- Add offline segment recognition for SenseVoice and Moonshine and keep X-ASR as a real streaming recognizer.
+- Validate official archives, store exact installed file fingerprints and use the matching native sherpa-onnx offline APIs.
+
+
 ## 0.1.15 · 2026-11-02
 
 - Model selections now use square theme-colored checkboxes for local speech and saved cloud profiles.
