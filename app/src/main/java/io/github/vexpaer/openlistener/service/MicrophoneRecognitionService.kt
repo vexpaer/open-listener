@@ -8,7 +8,6 @@ import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.os.PowerManager
 import android.widget.RemoteViews
-import kotlin.math.sqrt
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -276,18 +275,12 @@ class MicrophoneRecognitionService : Service() {
     private fun setState(value: State) { state = value; RecognitionRuntime.updateState(value); if (value !in listOf(State.FINISHED, State.ERROR, State.INTERRUPTED)) getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(value.name)) }
     private fun notificationSubtitleText(): String {
         val partial = RecognitionRuntime.partial.value
-        return if (notificationSubtitleMode == "translation") {
-            partial?.translated?.takeIf { it.isNotBlank() } ?: latestTranslation
-        } else {
-            partial?.text?.takeIf { it.isNotBlank() } ?: latestOriginal
-        }
+        return NotificationSubtitle.select(notificationSubtitleMode, partial?.text, partial?.translated,
+            latestOriginal, latestTranslation)
     }
 
-    private fun notificationVolume(): Int {
-        if (state != State.RECORDING) return 0
-        val level = RecognitionRuntime.level.value.coerceIn(0f, 1f)
-        return (sqrt(level) * 300f).toInt().coerceIn(0, 100)
-    }
+    private fun notificationVolume(): Int =
+        NotificationSubtitle.volume(RecognitionRuntime.level.value, state == State.RECORDING)
 
     private fun notification(status: String): Notification {
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
