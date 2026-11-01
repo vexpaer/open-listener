@@ -717,7 +717,8 @@ private fun RecordingPlayback(path: String, onPlayback: (Int, Boolean) -> Unit =
                 strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
             drawCircle(highlightColor, radius = 5.dp.toPx(),
                 center = Offset(progressX, centerY))
-        }    }
+        }
+    }
     if (failed) Text(tr("无法播放此录音", "Can't play audio"), color = MaterialTheme.colorScheme.error,
         style = MaterialTheme.typography.bodySmall)
 }
