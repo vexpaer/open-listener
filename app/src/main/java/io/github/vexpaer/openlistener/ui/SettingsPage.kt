@@ -48,6 +48,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
     val languageBusy by model.languageBusy.collectAsState()
     val modelStates by model.modelStates.collectAsState()
     val cloudProfiles by model.cloudProfiles.collectAsState()
+    val activeCloudProfiles by model.activeCloudProfiles.collectAsState()
     val editingAllowed = !state.isSessionActive()
     val list = rememberLazyListState()
     var guideFor by rememberSaveable { mutableStateOf<String?>(null) }
@@ -276,7 +277,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
                         }
                         "asr-cloud" -> item {
                             CloudProfilePanel("asr", cloudProfiles.filter { it.kind == "asr" },
-                                model.activeCloudProfile("asr")?.takeIf { prefs.asrProvider != "local" }, editingAllowed,
+                                activeCloudProfiles["asr"]?.takeIf { prefs.asrProvider != "local" }, editingAllowed,
                                 onSelect = model::selectCloudProfile,
                                 onAdd = { chooseCloudKind = "asr" },
                                 onEdit = { editingCloudProfile = it })
@@ -310,7 +311,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
                         }
                         "translation-cloud" -> item {
                             CloudProfilePanel("translation", cloudProfiles.filter { it.kind == "translation" },
-                                model.activeCloudProfile("translation")?.takeIf { prefs.translationProvider != "mlkit" }, editingAllowed,
+                                activeCloudProfiles["translation"]?.takeIf { prefs.translationProvider != "mlkit" }, editingAllowed,
                                 onSelect = model::selectCloudProfile,
                                 onAdd = { chooseCloudKind = "translation" },
                                 onEdit = { editingCloudProfile = it })
