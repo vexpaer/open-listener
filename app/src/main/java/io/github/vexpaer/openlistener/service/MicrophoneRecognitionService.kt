@@ -168,7 +168,7 @@ class MicrophoneRecognitionService : Service() {
             while (isActive) {
                 if (state in listOf(State.PREPARING, State.RECORDING, State.PAUSED)) {
                     val text = notificationSubtitleText()
-                                val signature = "$state:$notificationSubtitleMode:$text:$volume"
+                                val signature = "$state:$notificationSubtitleMode:$text"
                     if (++widgetTicks % 4 == 0 || signature != previous) {
                         ListeningWidget.publish(this@MicrophoneRecognitionService, text, state)
                     }
@@ -306,7 +306,6 @@ class MicrophoneRecognitionService : Service() {
         }
         val subtitle = notificationSubtitleText().trim().take(240)
             .ifEmpty { if (chinese) "等待实时字幕…" else "Waiting for live subtitles…" }
-        val volume = notificationVolume()
         val compact = RemoteViews(packageName, R.layout.notification_compact).apply {
             setTextViewText(R.id.notification_compact_subtitle, subtitle)
         }
