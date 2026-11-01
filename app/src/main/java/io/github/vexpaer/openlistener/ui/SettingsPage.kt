@@ -214,29 +214,47 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
                                             val phase = status?.phase ?: ModelPhase.NOT_INSTALLED
                                             var more by remember { mutableStateOf(false) }
                                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                                Checkbox(
+                                                    checked = phase == ModelPhase.INSTALLED &&
+                                                        prefs.asrProvider == "local" && prefs.localAsrModel == manifest.id,
+                                                    onCheckedChange = { if (it) model.selectLocalModel(manifest.id) },
+                                                    enabled = editingAllowed && phase == ModelPhase.INSTALLED,
+                                                    modifier = Modifier.size(44.dp).testTag("select-model-${manifest.id}"),
+                                                    colors = CheckboxDefaults.colors(
+                                                        checkedColor = MaterialTheme.colorScheme.primary,
+                                                        uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant))
                                                 Column(Modifier.weight(1f)) {
-                                                    Text(manifest.displayName.replace(" (INT8)", ""), style = MaterialTheme.typography.titleSmall)
-                                                    Text("${bytes(manifest.bytes)} · ${phaseLabel(phase)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                }
-                                                if (phase == ModelPhase.INSTALLED) {
-                                                    IconButton(onClick = { model.setLocalAsrModel(manifest.id) }, enabled = editingAllowed,
-                                                        modifier = Modifier.testTag("select-model-${manifest.id}")) {
-                                                        Icon(if (prefs.localAsrModel == manifest.id) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
-                                                            tr("选择模型", "Select model"), tint = MaterialTheme.colorScheme.primary)
-                                                    }
-                                                } else if (phase in listOf(ModelPhase.NOT_INSTALLED, ModelPhase.ERROR)) {
-                                                    IconButton(onClick = { model.downloadModel(manifest.id) }, enabled = editingAllowed,
-                                                        modifier = Modifier.testTag("download-asr-model-${manifest.id}")) {
-                                                        Icon(Icons.Outlined.Download, tr("下载模型", "Download model"), tint = MaterialTheme.colorScheme.primary)
+                                                    Text(manifest.displayName.replace(" (INT8)", ""),
+                                                        style = MaterialTheme.typography.titleSmall)
+                                                    Row(verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                                        Text("${bytes(manifest.bytes)} · ${phaseLabel(phase)}",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        if (phase == ModelPhase.INSTALLED)
+                                                            Icon(Icons.Outlined.CheckCircle, null,
+                                                                Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                                                     }
                                                 }
                                                 Box {
-                                                    IconButton(onClick = { more = true }) { Icon(Icons.Outlined.MoreHoriz, tr("模型选项", "Model options")) }
+                                                    IconButton(onClick = { more = true }) {
+                                                        Icon(Icons.Outlined.MoreHoriz, tr("模型选项", "Model options"))
+                                                    }
                                                     DropdownMenu(more, { more = false }) {
-                                                        DropdownMenuItem(text = { Text(tr("来源", "Source")) }, onClick = { more = false; model.openUrl(manifest.sourceUrl) })
-                                                        DropdownMenuItem(text = { Text(tr("许可证", "License")) }, onClick = { more = false; model.openUrl(manifest.licenseUrl) })
-                                                        if (phase == ModelPhase.INSTALLED) DropdownMenuItem(text = { Text(tr("删除模型", "Delete model")) },
-                                                            enabled = editingAllowed && status?.inUse != true, onClick = { more = false; deleteModel = manifest.id })
+                                                        if (phase in listOf(ModelPhase.NOT_INSTALLED, ModelPhase.ERROR))
+                                                            DropdownMenuItem(text = { Text(tr("下载模型", "Download model")) },
+                                                                enabled = editingAllowed, onClick = {
+                                                                    more = false
+                                                                    model.downloadModel(manifest.id)
+                                                                }, modifier = Modifier.testTag("download-asr-model-${manifest.id}"))
+                                                        DropdownMenuItem(text = { Text(tr("来源", "Source")) },
+                                                            onClick = { more = false; model.openUrl(manifest.sourceUrl) })
+                                                        DropdownMenuItem(text = { Text(tr("许可证", "License")) },
+                                                            onClick = { more = false; model.openUrl(manifest.licenseUrl) })
+                                                        if (phase == ModelPhase.INSTALLED)
+                                                            DropdownMenuItem(text = { Text(tr("删除模型", "Delete model")) },
+                                                                enabled = editingAllowed && status?.inUse != true,
+                                                                onClick = { more = false; deleteModel = manifest.id })
                                                     }
                                                 }
                                             }
@@ -253,12 +271,6 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
                                         }
                                     }
                                 }
-                            }
-                            item {
-                                OutlinedButton(onClick = model::checkSelectedEngines, enabled = !check.busy) {
-                                    Text(if (check.busy) tr("检查中…", "Checking…") else tr("检查配置", "Check setup"))
-                                }
-                                check.detail?.let { Hint(it) }
                             }
                         }
                         "asr-cloud" -> item {
