@@ -355,7 +355,38 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
 }
 
 @Composable
-private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, enabled: Boolean, onHelp: () -> Unit, onDismiss: () -> Unit) {
+private fun CloudProfilePanel(kind: String, profiles: List<CloudProfile>, selected: String?,
+                              enabled: Boolean, onSelect: (CloudProfile) -> Unit,
+                              onAdd: () -> Unit, onEdit: (CloudProfile) -> Unit) {
+    SettingsSection(tr("云端配置", "Cloud configurations"), Icons.Outlined.Cloud) {
+        profiles.forEach { profile ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(selected = selected == profile.id,
+                    onClick = { onSelect(profile) }, enabled = enabled,
+                    modifier = Modifier.weight(1f).testTag("$kind-profile-${profile.id}"),
+                    label = {
+                        Text(profile.label, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    })
+                IconButton(onClick = { onEdit(profile) }, enabled = enabled) {
+                    Icon(Icons.Outlined.Edit, tr("编辑", "Edit"))
+                }
+            }
+        }
+        OutlinedButton(onClick = onAdd, enabled = enabled,
+            modifier = Modifier.fillMaxWidth().testTag("$kind-add-cloud-profile")) {
+            Icon(Icons.Outlined.Add, null)
+            Text(if (profiles.isEmpty()) "  +  " else "  ")
+            if (profiles.isNotEmpty()) Text(tr("添加配置", "Add configuration"))
+        }
+    }
+}
+
+@Composable
+private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, enabled: Boolean, onHelp: () -> Unit,
+                              onDismiss: () -> Unit, onSaved: ((Map<String, String>) -> Unit)? = null,
+                              editing: CloudProfile? = null) {
     val asr = provider == "doubao"
     val ast = provider == "doubao_ast"
     val supportsLegacyAuth = asr || ast
@@ -367,16 +398,23 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
         else -> ""
     }
     val defaultModel = when (provider) { "translation_qwen" -> "qwen-plus"; "translation_openai" -> "gpt-4.1-mini"; "asr_openai" -> "gpt-transcribe"; "asr_qwen" -> "qwen3-asr-flash"; else -> "" }
+    val existing: (String) -> String = { field ->
+        when {
+            editing != null -> model.profileCredential(editing, field)
+            onSaved != null -> ""
+            else -> model.credential(provider, field)
+        }
+    }
     // Deliberately not rememberSaveable: secrets must never enter Activity saved-state bundles.
-    var key by remember(provider) { mutableStateOf(model.credential(provider, "api_key").ifBlank { if (ast) model.credential("doubao", "api_key") else "" }) }
-    var appId by remember(provider) { mutableStateOf(model.credential(provider, "app_id").ifBlank { if (ast) model.credential("doubao", "app_id") else "" }) }
-    var accessKey by remember(provider) { mutableStateOf(model.credential(provider, "access_key").ifBlank { if (ast) model.credential("doubao", "access_key") else "" }) }
+    var key by remember(provider) { mutableStateOf(existing("api_key").ifBlank { if (ast && onSaved == null) model.credential("doubao", "api_key") else "" }) }
+    var appId by remember(provider) { mutableStateOf(existing("app_id").ifBlank { if (ast && onSaved == null) model.credential("doubao", "app_id") else "" }) }
+    var accessKey by remember(provider) { mutableStateOf(existing("access_key").ifBlank { if (ast && onSaved == null) model.credential("doubao", "access_key") else "" }) }
     var legacyAuth by remember(provider) {
         mutableStateOf(appId.isNotBlank() || accessKey.isNotBlank())
     }
-    var resource by remember(provider) { mutableStateOf(model.credential(provider, "resource_id")) }
-    var base by remember(provider) { mutableStateOf(model.credential(provider, "base_url").ifBlank { defaultBase }) }
-    var modelId by remember(provider) { mutableStateOf(model.credential(provider, "model").ifBlank { defaultModel }) }
+    var resource by remember(provider) { mutableStateOf(existing("resource_id")) }
+    var base by remember(provider) { mutableStateOf(existing("base_url").ifBlank { defaultBase }) }
+    var modelId by remember(provider) { mutableStateOf(existing("model").ifBlank { defaultModel }) }
     val authValid = if (!supportsLegacyAuth || !legacyAuth) key.isNotBlank() else appId.isNotBlank() && accessKey.isNotBlank()
     val valid = authValid && if (asr) resource.isNotBlank() else if (ast) true else base.startsWith("https://") && modelId.isNotBlank()
     val clearAuth = key.isBlank() && appId.isBlank() && accessKey.isBlank()
@@ -422,9 +460,10 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
                     ast -> authFields
                     else -> authFields + mapOf("base_url" to base, "model" to modelId)
                 }
-                model.saveCredentials(provider, fields)
-                onDismiss(); model.checkSelectedEngines()
-            }, enabled = enabled && (valid || clearAuth)) { Text(tr("加密保存", "Save encrypted")) }
+                if (onSaved != null) onSaved(fields) else model.saveCredentials(provider, fields)
+                onDismiss()
+                if (onSaved == null) model.checkSelectedEngines()
+            }, enabled = enabled && if (onSaved != null) valid else valid || clearAuth) { Text(tr("加密保存", "Save encrypted")) }
         }, dismissButton = { TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) } })
 }
 
