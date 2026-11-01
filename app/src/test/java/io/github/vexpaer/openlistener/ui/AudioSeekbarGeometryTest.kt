@@ -12,7 +12,7 @@ class AudioSeekbarGeometryTest {
             val x = AudioSeekbarGeometry.positionX(
                 ms.toFloat(), durationMs.toFloat(), width, inset)
             val recovered = AudioSeekbarGeometry.seekPosition(x, width, inset, durationMs)
-            assertEquals(ms, recovered, 1)
+            assertEquals(ms.toDouble(), recovered.toDouble(), 1.0)
         }
     }
 
