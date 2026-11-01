@@ -207,7 +207,8 @@ class ModelDownloader {
                             expanded += entry.size
                             val relative = normalized.removePrefix(manifest.archiveRoot + "/")
                             val expected = wanted[relative] ?: continue
-                            check(entry.isFile && entry.size == expected.bytes && seen.add(relative)) {
+                            check(entry.isFile && (expected.bytes == 0L && entry.size > 0L || entry.size == expected.bytes)
+                                && seen.add(relative)) {
                                 "Duplicate or invalid model entry"
                             }
                             val target = safeTarget(destination, relative)
@@ -221,13 +222,16 @@ class ModelDownloader {
                                     val count = tar.read(buffer)
                                     if (count < 0) break
                                     written += count
-                                    check(written <= expected.bytes) { "Oversized model entry" }
+                                    check(written <= entry.size) { "Oversized model entry" }
                                     digest.update(buffer, 0, count)
                                     output.write(buffer, 0, count)
                                 }
-                                check(written == expected.bytes) { "Truncated model entry" }
+                                check(written == entry.size) { "Truncated model entry" }
                             }
-                            check(digest.digest().hex().equals(expected.sha256, true)) { "Extracted weight checksum mismatch" }
+                            if (expected.sha256.isNotBlank())
+                                check(digest.digest().hex().equals(expected.sha256, true)) {
+                                    "Extracted weight checksum mismatch"
+                                }
                         }
                     }
                 }

@@ -177,7 +177,8 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
                         color = if (LocalDarkAppearance.current) Color.White else Color.Black)
                     Spacer(Modifier.height(24.dp))
                     if (check.busy) Text(tr("正在检查所选引擎…", "Checking selected engines…"), style = MaterialTheme.typography.bodyMedium)
-                    else if (!check.ready) {
+                    else if (check.checked && !check.ready &&
+                        (check.missingSpeech || check.missingTranslation)) {
                         Text(when {
                             check.missingSpeech && check.missingTranslation -> tr("请配置语音与翻译模型", "Configure speech and translation models")
                             check.missingTranslation -> tr("请配置翻译模型", "Configure translation model")
@@ -187,6 +188,12 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
                         TextButton(onClick = { onSettings(if (check.missingTranslation && !check.missingSpeech) "translation" else "asr") },
                             modifier = Modifier.testTag("configure-engines")) {
                             Text(tr("前往配置", "Configure"))
+                        }
+                    } else if (check.checked && !check.ready && !check.detail.isNullOrBlank()) {
+                        Text(check.detail.orEmpty(), style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick = model::checkSelectedEngines) {
+                            Text(tr("重试检查", "Retry check"))
                         }
                     }
                 }
