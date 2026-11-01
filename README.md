@@ -10,7 +10,7 @@ Native Android · live bilingual text · optional audio retention
 
 [中文说明](README.zh-CN.md) · [Build](#build) · [Privacy](PRIVACY.md) · [License](LICENSE)
 
-**[Download v0.1.15](https://github.com/vexpaer/open-listener/releases/tag/v0.1.15) · ARM64 and Universal APKs**
+**[Download v0.1.16](https://github.com/vexpaer/open-listener/releases/tag/v0.1.16) · ARM64 and Universal APKs**
 
 </div>
 
@@ -20,11 +20,15 @@ Open Listener is a text-first Android companion for lectures, classes and semina
 
 ## What it does
 
-v0.1.15 adds timed lyric-style subtitle follow during playback, editable saved transcripts, tap-to-rename titles, a direct widget microphone action, theme-aware serif text, and simpler settings navigation.
+v0.1.16 adds SenseVoice Small INT8, X-ASR 480 ms INT8, and Moonshine v2 English Tiny/Base as downloadable on-device speech models. It also fixes occasional stale "configure models" messages after saving or selecting valid engine settings.
 
 
 
-New in v0.1.15: a live-subtitle home-screen widget with session controls, faster animated sky, warm-accent serif typography, a carrot recording control, an editable encrypted cloud configuration picker and refined audio progress controls.
+v0.1.16 adds timed lyric-style subtitle follow during playback, editable saved transcripts, tap-to-rename titles, a direct widget microphone action, theme-aware serif text, and simpler settings navigation.
+
+
+
+New in v0.1.16: a live-subtitle home-screen widget with session controls, faster animated sky, warm-accent serif typography, a carrot recording control, an editable encrypted cloud configuration picker and refined audio progress controls.
 
 
 
