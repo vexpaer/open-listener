@@ -66,7 +66,23 @@ class MainActivity : ComponentActivity() {
         }
     }
     override fun onStart() { super.onStart(); foreground = true }
-    override fun onResume() { super.onResume(); model.onActivityResumed() }
+    override fun onResume() {
+        super.onResume()
+        model.onActivityResumed()
+        if (intent?.action == io.github.vexpaer.openlistener.widget.ListeningWidget.ACTION_WIDGET_START) {
+            intent.action = null
+            requestMicrophone()
+        }
+    }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.action == io.github.vexpaer.openlistener.widget.ListeningWidget.ACTION_WIDGET_START &&
+            lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            intent.action = null
+            requestMicrophone()
+        }
+    }
     override fun onStop() { foreground = false; super.onStop() }
 
     private fun hasMicrophonePermission() = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
