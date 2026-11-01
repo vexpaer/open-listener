@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import io.github.vexpaer.openlistener.R
+import io.github.vexpaer.openlistener.ui.theme.LocalDarkAppearance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -165,7 +166,8 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
                     Icon(Icons.Outlined.GraphicEq, null, Modifier.size(38.dp),
                         tint = androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.primary, Color.Black, .30f))
                     Spacer(Modifier.height(20.dp))
-                    Text(tr("听见课堂，\n读懂每一句。", "Listen clearly.\nRead along."), style = MaterialTheme.typography.headlineSmall, color = Color.Black)
+                    Text(tr("听见课堂，\n读懂每一句。", "Listen clearly.\nRead along."), style = MaterialTheme.typography.headlineSmall,
+                        color = if (LocalDarkAppearance.current) Color.White else Color.Black)
                     Spacer(Modifier.height(24.dp))
                     if (check.busy) Text(tr("正在检查所选引擎…", "Checking selected engines…"), style = MaterialTheme.typography.bodyMedium)
                     else if (!check.ready) {
@@ -231,8 +233,8 @@ private fun ListeningButton(label: String, level: Float, enabled: Boolean = true
                 drawCircle(color.copy(alpha = .22f + signal * .3f), radius = size.minDimension * (.42f + .06f * signal), style = Stroke((1.5f + signal * 2f).dp.toPx()))
             }
             val palette = MaterialTheme.colorScheme
-            val top = if (stop) palette.surface else androidx.compose.ui.graphics.lerp(palette.primary, Color.Black, .18f)
-            val bottom = if (stop) palette.surfaceVariant else androidx.compose.ui.graphics.lerp(palette.primary, Color.Black, .32f)
+            val top = if (stop) palette.surface else androidx.compose.ui.graphics.lerp(palette.primary, Color.Black, .09f)
+            val bottom = if (stop) palette.surfaceVariant else androidx.compose.ui.graphics.lerp(palette.primary, Color.Black, .16f)
             Button(onClick = onClick, enabled = enabled, shape = CircleShape, interactionSource = interaction,
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent,
                     contentColor = if (stop) palette.onSurface else palette.onPrimary,
@@ -390,9 +392,6 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
     var mode by rememberSaveable { mutableStateOf(TranscriptMode.BILINGUAL) }
     var rename by rememberSaveable { mutableStateOf(false) }
     var editMode by rememberSaveable(id) { mutableStateOf(false) }
-    var editingSegment by remember { mutableStateOf<SegmentEntity?>(null) }
-    var editOriginal by remember { mutableStateOf("") }
-    var editTranslated by remember { mutableStateOf("") }
     var playing by remember(id) { mutableStateOf(false) }
     var playbackMs by remember(id) { mutableIntStateOf(0) }
     val renameFocus = remember { FocusRequester() }
@@ -464,64 +463,27 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
             }
             if (segments.isEmpty()) item { Text(tr("这场聆听没有已确认的文字。", "This session has no confirmed text."), color = MaterialTheme.colorScheme.onSurfaceVariant) }
             items(visibleSegments, key = { it.sequence }) { segment ->
-                val rowContent: @Composable () -> Unit = {
-                    TranscriptParagraph(segment, mode, prefs.subtitleFontScale, retrying.contains(segment.sequence),
-                        model::copyText, onRetry = { model.retryTranslation(id, segment.sequence) },
-                        canRetry = current.asrProvider != "doubao_ast" && !editMode,
-                        onEdit = if (editMode) ({
-                            editingSegment = segment
-                            editOriginal = segment.original
-                            editTranslated = segment.translated.orEmpty()
-                        }) else null)
-                }
-                when {
-                    editMode -> Surface(
-                        onClick = {
-                            editingSegment = segment
-                            editOriginal = segment.original
-                            editTranslated = segment.translated.orEmpty()
-                        },
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = .08f),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth().testTag("edit-segment-${segment.sequence}")
-                    ) {
-                        Column(Modifier.padding(10.dp)) {
-                            rowContent()
-                            Text(tr("点击修改这段文字", "Tap to edit text"),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary)
-                        }
+                if (editMode) {
+                    EditableTranscriptParagraph(segment, mode, prefs.subtitleFontScale) { original, translated ->
+                        model.editSegmentContent(id, segment.sequence, original, translated)
                     }
-                    segment.sequence == playingSequence -> Surface(
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = .15f),
-                        shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()
-                    ) { Box(Modifier.padding(10.dp)) { rowContent() } }
-                    else -> rowContent()
+                } else {
+                    val content: @Composable () -> Unit = {
+                        TranscriptParagraph(segment, mode, prefs.subtitleFontScale,
+                            retrying.contains(segment.sequence), model::copyText,
+                            onRetry = { model.retryTranslation(id, segment.sequence) },
+                            canRetry = current.asrProvider != "doubao_ast")
+                    }
+                    if (segment.sequence == playingSequence) {
+                        Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = .15f),
+                            shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                            Box(Modifier.padding(10.dp)) { content() }
+                        }
+                    } else content()
                 }
             }
         }
     }
-    }
-    editingSegment?.let { segment ->
-        AlertDialog(onDismissRequest = { editingSegment = null },
-            title = { Text(tr("修改字幕", "Edit transcript")) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(editOriginal, { editOriginal = it.take(10_000) },
-                        label = { Text(tr("原文", "Original")) }, modifier = Modifier.fillMaxWidth(),
-                        minLines = 2, maxLines = 6)
-                    OutlinedTextField(editTranslated, { editTranslated = it.take(10_000) },
-                        label = { Text(tr("译文", "Translation")) }, modifier = Modifier.fillMaxWidth(),
-                        minLines = 2, maxLines = 6)
-                }
-            },
-            confirmButton = { TextButton(onClick = {
-                model.editSegmentContent(id, segment.sequence, editOriginal, editTranslated)
-                editingSegment = null
-            }, enabled = editOriginal.isNotBlank() || editTranslated.isNotBlank()) {
-                Text(tr("保存", "Save"))
-            } },
-            dismissButton = { TextButton(onClick = { editingSegment = null }) { Text(tr("取消", "Cancel")) } })
     }
     if (rename) AlertDialog(onDismissRequest = { rename = false },
         title = { Text(tr("修改标题", "Rename record")) },
@@ -541,6 +503,48 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
         text = { Text(tr("已保存的原文和译文将永久删除。导出的文件不受影响。", "Saved originals and translations will be permanently deleted. Exported documents are unaffected.")) },
         confirmButton = { TextButton(onClick = { model.deleteSession(id); delete = false; onBack() }) { Text(tr("删除", "Delete"), color = MaterialTheme.colorScheme.error) } },
         dismissButton = { TextButton(onClick = { delete = false }) { Text(tr("保留", "Keep")) } })
+}
+
+/** Edit directly in the record, keeping each raw segment independently editable. */
+@Composable
+private fun EditableTranscriptParagraph(segment: SegmentEntity, mode: TranscriptMode,
+                                        fontScale: Float, onSave: (String, String?) -> Unit) {
+    var original by remember(segment.sessionId, segment.sequence, segment.original) {
+        mutableStateOf(segment.original)
+    }
+    var translated by remember(segment.sessionId, segment.sequence, segment.translated) {
+        mutableStateOf(segment.translated.orEmpty())
+    }
+    val changed = original != segment.original || translated != segment.translated.orEmpty()
+    Column(Modifier.fillMaxWidth().testTag("edit-segment-${segment.sequence}"),
+        verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        if (mode != TranscriptMode.TRANSLATION) {
+            OutlinedTextField(original, { original = it.take(10_000) },
+                modifier = Modifier.fillMaxWidth().testTag("edit-original-${segment.sequence}"),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = (17 * fontScale).sp),
+                maxLines = 10)
+        }
+        if (mode != TranscriptMode.ORIGINAL) {
+            OutlinedTextField(translated, { translated = it.take(10_000) },
+                modifier = Modifier.fillMaxWidth().testTag("edit-translation-${segment.sequence}"),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = (18 * fontScale).sp),
+                maxLines = 10)
+        }
+        if (changed) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = {
+                    original = segment.original
+                    translated = segment.translated.orEmpty()
+                }) { Text(tr("撤销", "Discard")) }
+                Button(onClick = { onSave(original, translated.takeIf { it.isNotBlank() }) },
+                    enabled = original.isNotBlank() || translated.isNotBlank(),
+                    modifier = Modifier.testTag("save-segment-${segment.sequence}")) {
+                    Text(tr("保存", "Save"))
+                }
+            }
+        }
+    }
 }
 
 @Composable private fun sessionStatus(state: String): String = when (state.uppercase()) {
