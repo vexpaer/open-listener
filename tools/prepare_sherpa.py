@@ -38,10 +38,13 @@ SOURCE_BASE = (
     f"{SOURCE_COMMIT}/sherpa-onnx/kotlin-api/"
 )
 KOTLIN_FILES = (
-    "OnlineRecognizer.kt", "OnlineStream.kt", "FeatureConfig.kt",
-    "QnnConfig.kt", "HomophoneReplacerConfig.kt",
+    "OnlineRecognizer.kt", "OnlineStream.kt", "OfflineRecognizer.kt",
+    "OfflineStream.kt", "FeatureConfig.kt", "QnnConfig.kt",
+    "HomophoneReplacerConfig.kt",
 )
 EXPECTED_SOURCE_SHA256 = {
+    "OfflineRecognizer.kt": "8103b67ec65910a71e6b8d4bca7934f77c1af47b68a5c18cdca0ce3f956247a7",
+    "OfflineStream.kt": "5c90b7c060cdd0a2222cc935b54f69465a4a7544de29240bafe4d3a8d86dbb6e",
     "OnlineRecognizer.kt": "3204ff816361d99d94dda1e8c26681f6d4a5ad749a68d8fee93b4e8bb2b21d17",
     "OnlineStream.kt": "6b9f8de317e6a0bb51f0f29d940617b781cb31b190e1c725dd438231836c06ab",
     "FeatureConfig.kt": "829c7adc4db1324f21b9a9cbf5bf10eacf759714fe50956f48317c1ffef044f6",
