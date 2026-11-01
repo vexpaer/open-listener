@@ -68,7 +68,7 @@ import kotlinx.coroutines.launch
 private enum class TranscriptMode { BILINGUAL, ORIGINAL, TRANSLATION }
 
 @Composable
-internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSettings: () -> Unit) {
+internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSettings: (String) -> Unit) {
     val prefs by model.preferences.collectAsState()
     val state by model.serviceState.collectAsState()
     val segments by model.liveSegments.collectAsState()
@@ -153,7 +153,7 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
                     }
                 }
                 active -> EmptyReading(Icons.Outlined.GraphicEq, tr("等待第一段文字", "Waiting for the first words"),
-                    tr("识别到的确认文字会自动保存在本机。", "Confirmed words are saved on this device as you listen."))
+                    "")
                 else -> Column(Modifier.fillMaxSize().testTag("listen-empty"), verticalArrangement = Arrangement.Center) {
                     Icon(Icons.Outlined.GraphicEq, null, Modifier.size(38.dp),
                         tint = androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.primary, Color.Black, .30f))
@@ -162,10 +162,15 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
                     Spacer(Modifier.height(24.dp))
                     if (check.busy) Text(tr("正在检查所选引擎…", "Checking selected engines…"), style = MaterialTheme.typography.bodyMedium)
                     else if (!check.ready) {
-                        Text(check.detail ?: tr("开始前，请下载离线模型或连接自己的 API。", "Download an offline model or connect your own API before listening."),
+                        Text(when {
+                            check.missingSpeech && check.missingTranslation -> tr("请配置语音与翻译模型", "Configure speech and translation models")
+                            check.missingTranslation -> tr("请配置翻译模型", "Configure translation model")
+                            else -> tr("请配置语音模型", "Configure speech model")
+                        },
                             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("engine-unavailable"))
-                        TextButton(onClick = onSettings, modifier = Modifier.testTag("configure-engines")) {
-                            Text(tr("下载模型 / 连接 API", "Models / Connect API"))
+                        TextButton(onClick = { onSettings(if (check.missingTranslation && !check.missingSpeech) "translation" else "asr") },
+                            modifier = Modifier.testTag("configure-engines")) {
+                            Text(tr("前往配置", "Configure"))
                         }
                     }
                 }
@@ -450,7 +455,7 @@ internal val LocalReadingSurfaceAlpha = staticCompositionLocalOf { .20f }
     Column(modifier, verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.Start) {
         Icon(icon, null, Modifier.size(36.dp), tint = MaterialTheme.colorScheme.primary)
         Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 18.dp))
-        Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
+        if (body.isNotBlank()) Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
     }
 }
 
