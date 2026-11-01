@@ -39,6 +39,7 @@ class MicrophoneRecognitionService : Service() {
     private var consumer: Job? = null
     private var events: Job? = null
     private var errors: Job? = null
+    private var connectionState: Job? = null
     private var ticker: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
     @Volatile private var state = State.IDLE
@@ -122,6 +123,7 @@ class MicrophoneRecognitionService : Service() {
         }
         (engine as? DoubaoSimultaneousAsr)?.let { cloud ->
             errors = scope.launch { cloud.errors.collect { error -> if (error != null && !terminating) reportFailure(error) } }
+            connectionState = scope.launch { cloud.reconnecting.collect { RecognitionRuntime.updateReconnecting(it) } }
         }
         engine!!.start(id!!)
         startConsumer()
@@ -203,6 +205,7 @@ class MicrophoneRecognitionService : Service() {
                 cleanup { events?.join() }
                 events?.cancelAndJoin()
                 errors?.cancelAndJoin()
+                connectionState?.cancelAndJoin()
                 cleanup { queue?.drain(8_000) }
                 cleanup { translator?.close() }
                 if (engine?.capabilities?.providesTranslation == true) cleanup { id?.let { app.repository.markIncompleteTranslations(it) } }
