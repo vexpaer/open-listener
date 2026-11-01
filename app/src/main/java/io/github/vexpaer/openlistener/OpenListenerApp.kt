@@ -36,7 +36,9 @@ open class OpenListenerApp : Application() {
     open fun newCapture(): io.github.vexpaer.openlistener.audio.PcmCapture = io.github.vexpaer.openlistener.audio.AudioPcmCapture()
 
     open fun newAsr(prefs: AppPreferences): AsrEngine = when (prefs.asrProvider) {
-        "local" -> SherpaStreamingAsr(models, prefs.localAsrModel)
+        "local" -> if (models.catalog.singleOrNull { it.id == prefs.localAsrModel }?.backend?.startsWith("offline-") == true)
+            SherpaOfflineAsr(models, prefs.localAsrModel)
+        else SherpaStreamingAsr(models, prefs.localAsrModel)
         "doubao" -> DoubaoRealtimeAsr(credentials)
         "doubao_ast" -> DoubaoSimultaneousAsr(credentials, prefs.sourceLanguage, prefs.targetLanguage)
         "qwen", "openai", "custom" -> CloudChunkAsr(prefs.asrProvider, credentials, prefs.sourceLanguage)
