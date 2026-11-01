@@ -176,17 +176,25 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
                     Text(tr("听见课堂，\n读懂每一句。", "Listen clearly.\nRead along."), style = MaterialTheme.typography.headlineSmall,
                         color = if (LocalDarkAppearance.current) Color.White else Color.Black)
                     Spacer(Modifier.height(24.dp))
-                    if (check.busy) Text(tr("正在检查所选引擎…", "Checking selected engines…"), style = MaterialTheme.typography.bodyMedium)
-                    else if (!check.ready) {
+                    if (check.busy || !check.checked) {
+                        Text(tr("正在检查所选模型…", "Checking selected models…"),
+                            style = MaterialTheme.typography.bodyMedium)
+                    } else if (!check.ready) {
                         Text(when {
-                            check.missingSpeech && check.missingTranslation -> tr("请配置语音与翻译模型", "Configure speech and translation models")
+                            check.unavailable -> check.detail ?: tr("当前模型暂时不可用", "Selected model unavailable")
+                            check.needsDownload -> check.detail ?: tr("请下载所选模型", "Download selected model")
+                            check.missingSpeech && check.missingTranslation ->
+                                tr("请配置语音与翻译模型", "Configure speech and translation models")
                             check.missingTranslation -> tr("请配置翻译模型", "Configure translation model")
                             else -> tr("请配置语音模型", "Configure speech model")
-                        },
-                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("engine-unavailable"))
-                        TextButton(onClick = { onSettings(if (check.missingTranslation && !check.missingSpeech) "translation" else "asr") },
-                            modifier = Modifier.testTag("configure-engines")) {
-                            Text(tr("前往配置", "Configure"))
+                        }, style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.testTag("engine-unavailable"))
+                        TextButton(onClick = {
+                            onSettings(if (check.missingTranslation && !check.missingSpeech) "translation" else "asr")
+                        }, modifier = Modifier.testTag("configure-engines")) {
+                            Text(if (check.needsDownload) tr("前往下载", "Download model")
+                                 else tr("前往配置", "Configure"))
                         }
                     }
                 }
