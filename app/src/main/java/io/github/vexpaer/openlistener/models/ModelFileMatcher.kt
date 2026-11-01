@@ -10,7 +10,7 @@ object ModelFileMatcher {
         val prefix = pattern.substringBefore('*')
         val suffix = pattern.substringAfter('*')
         return name.startsWith(prefix) && name.endsWith(suffix) &&
-            name.length > prefix.length + suffix.length &&
+            name.length >= prefix.length + suffix.length &&
             !name.contains('/') && !name.contains('\\')
     }
 
