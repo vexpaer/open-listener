@@ -13,17 +13,21 @@ object RecognitionRuntime {
     private val _elapsedMs = MutableStateFlow(0L)
     private val _error = MutableStateFlow<String?>(null)
     private val _partial = MutableStateFlow<TranscriptEvent?>(null)
+    private val _reconnecting = MutableStateFlow(false)
     val state = _state.asStateFlow()
     val sessionId = _sessionId.asStateFlow()
     val level = _level.asStateFlow()
     val elapsedMs = _elapsedMs.asStateFlow()
     val error = _error.asStateFlow()
     val partial = _partial.asStateFlow()
+    val reconnecting = _reconnecting.asStateFlow()
+    fun updateReconnecting(value: Boolean) { _reconnecting.value = value }
     private var startedElapsed = 0L
 
     fun begin(id: String) {
         _sessionId.value = id
         _partial.value = null
+        _reconnecting.value = false
         _error.value = null
         _elapsedMs.value = 0L
         startedElapsed = SystemClock.elapsedRealtime()
@@ -36,6 +40,7 @@ object RecognitionRuntime {
     fun end() {
         tick()
         _partial.value = null
+        _reconnecting.value = false
         _level.value = 0f
         _sessionId.value = null
         startedElapsed = 0L
