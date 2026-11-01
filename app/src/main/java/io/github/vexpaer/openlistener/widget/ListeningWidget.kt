@@ -69,7 +69,7 @@ class ListeningWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_subtitle, subtitle.takeIf { it.isNotBlank() } ?: "Live subtitles appear here")
             views.setTextViewText(R.id.widget_state, status)
             views.setImageViewResource(R.id.widget_primary,
-                if (recording) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play)
+                if (recording) R.drawable.ic_widget_pause else R.drawable.ic_widget_play)
             views.setContentDescription(R.id.widget_primary, when {
                 recording -> "Pause"
                 paused -> "Resume"
