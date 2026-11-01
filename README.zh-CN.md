@@ -6,7 +6,7 @@
 
 [English](README.md) · [构建](#构建) · [隐私](PRIVACY.md)
 
-> **[下载 v0.1.10](https://github.com/vexpaer/open-listener/releases/tag/v0.1.10)** · ARM64 / Universal APK；支持应用内更新。
+> **[下载 v0.1.11](https://github.com/vexpaer/open-listener/releases/tag/v0.1.11)** · ARM64 / Universal APK；支持应用内更新。
 
 Open Listener 面向课程、讲座和研讨会。打开应用后在可见页面点击一次，实时阅读原文与译文，并将已经确认的文字保存为可搜索记录。“保留录音”默认关闭，开启后可将新会话录音保存在本机。
 
@@ -15,6 +15,9 @@ Open Listener 面向课程、讲座和研讨会。打开应用后在可见页面
 </div>
 
 ## 功能
+
+豆包同传支持断线自动重连（有限次数重试、内存短时音频缓冲及恢复提示）。根据句末标点合并双语字幕，录音界面、历史记录、复制与 PDF/Markdown/ZIP 导出均显示合并后的句子，内部保留原始分句供译文修订。
+
 
 记录页右下角支持将全部文字记录和保留的录音导出为 ZIP；本地识别新增 English GigaSpeech 模型。开始按钮的三角形与暂停图形动态变形，移除准备阶段进度条。
 

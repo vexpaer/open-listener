@@ -12,6 +12,7 @@ import io.github.vexpaer.openlistener.OpenListenerApp
 import io.github.vexpaer.openlistener.asr.EngineAvailability
 import io.github.vexpaer.openlistener.data.AppPreferences
 import io.github.vexpaer.openlistener.data.SegmentEntity
+import io.github.vexpaer.openlistener.data.SentenceGrouper
 import io.github.vexpaer.openlistener.data.SessionEntity
 import io.github.vexpaer.openlistener.export.TranscriptExporter
 import io.github.vexpaer.openlistener.export.TranscriptArchive
@@ -91,6 +92,7 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
     val elapsedMs = RecognitionRuntime.elapsedMs
     val serviceError = RecognitionRuntime.error
     val partial = RecognitionRuntime.partial
+    val reconnecting = RecognitionRuntime.reconnecting
     val liveSegments = activeSessionId.flatMapLatest { id ->
         if (id == null) flowOf(emptyList()) else repository.observeSegments(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -350,7 +352,8 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
     private fun withSession(id: String, block: suspend (SessionEntity, List<SegmentEntity>) -> Unit) = viewModelScope.launch {
         try {
             val session = repository.getSession(id) ?: error(text("记录已不存在。", "This record no longer exists."))
-            block(session, repository.listSegments(id))
+            val raw = repository.listSegments(id)
+            block(session, if (session.asrProvider == "doubao_ast") SentenceGrouper.group(raw) else raw)
         } catch (error: Exception) { showError(error) }
     }
     private val _exportingArchive = MutableStateFlow(false)
@@ -369,7 +372,10 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
                     val directory = File(app.cacheDir, "exports").apply { check(exists() || mkdirs()) }
                     val target = File(directory, "OpenListener-records-${System.currentTimeMillis()}.zip")
                     val pending = File(directory, target.name + ".partial").also { temporary = it }
-                    val records = all.map { TranscriptArchive.Record(it, repository.listSegments(it.id)) }
+                    val records = all.map { session ->
+                        val raw = repository.listSegments(session.id)
+                        TranscriptArchive.Record(session, if (session.asrProvider == "doubao_ast") SentenceGrouper.group(raw) else raw)
+                    }
                     val context = currentCoroutineContext()
                     TranscriptArchive.write(records, pending.outputStream()) { context.ensureActive() }
                     check(pending.renameTo(target)) { "Unable to finalize ZIP archive" }

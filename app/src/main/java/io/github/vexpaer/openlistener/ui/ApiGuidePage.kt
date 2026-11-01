@@ -102,17 +102,20 @@ private fun apiGuide(provider: String, savedBaseUrl: String): ApiGuide {
     val docs = tr("官方教程", "Official guide")
     return when (provider) {
         "doubao_ast" -> ApiGuide(tr("豆包同传 2.0 · 字幕模式", "Doubao AST 2.0 · Subtitles"), listOf(
-            tr("在豆包语音控制台开通“同声传译 2.0”服务。", "Enable Simultaneous Translation 2.0 in the Doubao Speech console."),
-            tr("在 API 管理中创建 API Key，并保存到当前配置。资源 ID 已内置，无需填写。", "Create an API key and save it here. The resource ID is configured automatically."),
+            tr("在豆包语音控制台开通“同声传译 2.0”，并确认服务和凭据位于同一项目。", "Enable Simultaneous Translation 2.0 and keep the service and credentials in the same project."),
+            tr("新版控制台使用 API Key；旧版控制台选择“旧版控制台”，填写 App ID 和 Access Token。资源 ID 已内置。", "Use an API Key with the new console. For the legacy console, select Legacy console and enter the App ID and Access Token. The resource ID is built in."),
+            tr("如果返回 HTTP 403，请检查同传服务是否在该凭据所属项目开通；若服务端返回追踪 ID，错误信息会附上它。", "For HTTP 403, check whether AST is enabled in the credential's project. If the server returns a trace ID, it will appear in the error."),
             tr("在首页选择语音源语言和翻译目标，开始聆听。原文与译文均由同传模型生成，不会读出译文。", "Choose the spoken and target languages, then start listening. The model supplies both subtitle streams without spoken output.")
         ), listOf(getKey to "https://console.volcengine.com/speech/new/setting/apikeys",
-            docs to "https://docs.volcengine.com/docs/doubao-voice/simultaneous-interpretation2-0-api-access-documentation?lang=zh"))
+            docs to "https://docs.volcengine.com/docs/doubao-voice/simultaneous-interpretation2-0-api-access-documentation?lang=zh",
+            tr("旧版鉴权说明", "Legacy authentication guide") to "https://docs.volcengine.com/docs/doubao-voice/old-version-console-authentication-reference-example?lang=zh"))
         "doubao" -> ApiGuide(tr("豆包 · 语音识别", "Doubao · Speech recognition"), listOf(
-            tr("打开豆包语音控制台，在同一项目中开通“流式语音识别 2.0”。", "Open the Doubao Speech console and enable Streaming ASR 2.0 in your project."),
-            tr("在“API 管理”中创建并复制 API Key。", "Create and copy a key under API management."),
-            tr("返回填写 X-Api-Key 和对应的 X-Api-Resource-Id。2.0 小时版资源 ID 为 volc.seedasr.sauc.duration，然后保存。", "Enter X-Api-Key and the matching X-Api-Resource-Id. The 2.0 hourly resource ID is volc.seedasr.sauc.duration, then save.")
+            tr("打开豆包语音控制台，在凭据所属项目中开通“流式语音识别 2.0”。", "Open the Doubao Speech console and enable Streaming ASR 2.0 in the credential's project."),
+            tr("新版控制台使用 API Key；旧版控制台选择“旧版控制台”，填写 App Key 和 Access Token。", "Use an API Key with the new console. For the legacy console, select Legacy console and enter the App Key and Access Token."),
+            tr("填写对应的 X-Api-Resource-Id。2.0 小时版资源 ID 为 volc.seedasr.sauc.duration。HTTP 403 表示该凭据没有模型权限或服务未在项目中开通。", "Enter the matching X-Api-Resource-Id. The 2.0 hourly resource ID is volc.seedasr.sauc.duration. HTTP 403 means the credential lacks model access or the service is not enabled for its project.")
         ), listOf(getKey to "https://console.volcengine.com/speech/new/setting/apikeys",
-            docs to "https://docs.volcengine.com/docs/doubao-voice/console-guidance?lang=zh"))
+            docs to "https://docs.volcengine.com/docs/doubao-voice/unidirectional-streaming-automatic-speech-recognition-websocket?lang=zh",
+            tr("旧版鉴权说明", "Legacy authentication guide") to "https://docs.volcengine.com/docs/doubao-voice/old-version-console-authentication-reference-example?lang=zh"))
         "asr_openai", "asr_custom" -> ApiGuide(tr("语音识别 · OpenAI 兼容", "Speech · OpenAI compatible"), listOf(
             tr("在服务商控制台创建 API Key 并开通语音转写模型。", "Create an API key and enable a speech transcription model."),
             tr("填写 HTTPS API 根路径和模型 ID，例如 gpt-transcribe。自定义服务必须兼容 /audio/transcriptions 的 WAV 文件上传。", "Enter the HTTPS API root and model ID, for example gpt-transcribe. Custom services must accept WAV uploads at /audio/transcriptions."),

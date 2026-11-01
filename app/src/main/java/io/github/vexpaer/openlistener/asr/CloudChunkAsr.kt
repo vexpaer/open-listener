@@ -129,7 +129,7 @@ class CloudChunkAsr(
         val request = Request.Builder().url(checkNotNull(endpoint())).header("Authorization", "Bearer ${credential("api_key")}").post(body).build()
         val response = client.newCall(request).await()
         return response.use {
-            check(it.isSuccessful) { "Speech API HTTP ${it.code}. Check credentials, model and quota." }
+            check(it.isSuccessful) { httpError(it.code) }
             val source = it.body?.source() ?: error("Empty speech API response")
             source.request(1_048_577)
             val bytes = source.buffer.readByteArray()
@@ -139,6 +139,17 @@ class CloudChunkAsr(
             if (provider == "qwen") json["choices"]!!.jsonArray.first().jsonObject["message"]!!.jsonObject["content"]!!.jsonPrimitive.content.trim()
             else json["text"]!!.jsonPrimitive.content.trim()
         }
+    }
+    private fun httpError(status: Int): String = when (status) {
+        400, 422 -> "Speech API HTTP $status: request format is not supported by the selected model."
+        401 -> "Speech API HTTP 401: the API key is invalid, disabled or expired."
+        403 -> "Speech API HTTP 403: the key lacks access to this model, or the model service is not enabled for its project."
+        404 -> "Speech API HTTP 404: the API endpoint or model was not found."
+        408, 504 -> "Speech API HTTP $status: the provider timed out."
+        413 -> "Speech API HTTP 413: the audio chunk exceeds the provider's request limit."
+        429 -> "Speech API HTTP 429: request rate or quota limit exceeded."
+        in 500..599 -> "Speech API HTTP $status: the provider is temporarily unavailable."
+        else -> "Speech API HTTP $status: request failed."
     }
     private suspend fun Call.await(): Response = suspendCancellableCoroutine { continuation ->
         continuation.invokeOnCancellation { cancel() }

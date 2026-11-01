@@ -319,6 +319,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
 private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, enabled: Boolean, onHelp: () -> Unit, onDismiss: () -> Unit) {
     val asr = provider == "doubao"
     val ast = provider == "doubao_ast"
+    val supportsLegacyAuth = asr || ast
     val defaultBase = when (provider) {
         "translation_doubao" -> "https://ark.cn-beijing.volces.com/api/v3"
         "translation_qwen" -> "https://dashscope.aliyuncs.com/compatible-mode/v1"
@@ -329,10 +330,17 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
     val defaultModel = when (provider) { "translation_qwen" -> "qwen-plus"; "translation_openai" -> "gpt-4.1-mini"; "asr_openai" -> "gpt-transcribe"; "asr_qwen" -> "qwen3-asr-flash"; else -> "" }
     // Deliberately not rememberSaveable: secrets must never enter Activity saved-state bundles.
     var key by remember(provider) { mutableStateOf(model.credential(provider, "api_key").ifBlank { if (ast) model.credential("doubao", "api_key") else "" }) }
+    var appId by remember(provider) { mutableStateOf(model.credential(provider, "app_id").ifBlank { if (ast) model.credential("doubao", "app_id") else "" }) }
+    var accessKey by remember(provider) { mutableStateOf(model.credential(provider, "access_key").ifBlank { if (ast) model.credential("doubao", "access_key") else "" }) }
+    var legacyAuth by remember(provider) {
+        mutableStateOf(appId.isNotBlank() || accessKey.isNotBlank())
+    }
     var resource by remember(provider) { mutableStateOf(model.credential(provider, "resource_id")) }
     var base by remember(provider) { mutableStateOf(model.credential(provider, "base_url").ifBlank { defaultBase }) }
     var modelId by remember(provider) { mutableStateOf(model.credential(provider, "model").ifBlank { defaultModel }) }
-    val valid = key.isNotBlank() && if (asr) resource.isNotBlank() else if (ast) true else base.startsWith("https://") && modelId.isNotBlank()
+    val authValid = if (!supportsLegacyAuth || !legacyAuth) key.isNotBlank() else appId.isNotBlank() && accessKey.isNotBlank()
+    val valid = authValid && if (asr) resource.isNotBlank() else if (ast) true else base.startsWith("https://") && modelId.isNotBlank()
+    val clearAuth = key.isBlank() && appId.isBlank() && accessKey.isBlank()
     AlertDialog(onDismissRequest = onDismiss, title = {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(if (ast) tr("豆包同声传译", "Doubao simultaneous translation") else if (asr) tr("豆包实时语音", "Doubao streaming speech") else if (provider.startsWith("asr_")) tr("语音识别 API", "Speech API") else tr("翻译 API", "Translation API"), modifier = Modifier.weight(1f))
@@ -342,10 +350,23 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Hint(tr("密钥在本机加密保存", "Keys are encrypted on this device"))
-                SecretField(key, { key = it }, if (asr) "X-Api-Key" else "API key", true)
+                if (supportsLegacyAuth) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = !legacyAuth, onClick = { legacyAuth = false },
+                            label = { Text(tr("新版 API Key", "New API Key")) })
+                        FilterChip(selected = legacyAuth, onClick = { legacyAuth = true },
+                            label = { Text(tr("旧版控制台", "Legacy console")) })
+                    }
+                }
+                if (supportsLegacyAuth && legacyAuth) {
+                    SecretField(appId, { appId = it }, if (ast) "X-Api-App-Id" else "X-Api-App-Key", false)
+                    SecretField(accessKey, { accessKey = it }, "X-Api-Access-Key", true)
+                } else {
+                    SecretField(key, { key = it }, if (supportsLegacyAuth) "X-Api-Key" else "API key", true)
+                }
                 if (asr) SecretField(resource, { resource = it }, "X-Api-Resource-Id", true)
                 else if (ast) {
-                    Hint(tr("开通同传 2.0 服务后保存 Key。应用使用 S2T 字幕模式。", "Enable AST 2.0, then save the key. The app uses S2T subtitle mode."))
+                    Hint(tr("请在 API Key 所属项目开通同传 2.0。应用使用 S2T 字幕模式；旧版控制台需填写 App ID 和 Access Token。", "Enable AST 2.0 in the credential's project. The app uses S2T subtitles; legacy console credentials require an App ID and Access Token."))
                 } else {
                     SecretField(base, { base = it }, "Base URL · HTTPS", false)
                     SecretField(modelId, { modelId = it }, "Model / Endpoint ID", false)
@@ -354,9 +375,17 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
             }
         }, confirmButton = {
             TextButton(onClick = {
-                model.saveCredentials(provider, if (ast) mapOf("api_key" to key) else if (asr) mapOf("api_key" to key, "resource_id" to resource) else mapOf("api_key" to key, "base_url" to base, "model" to modelId))
+                val authFields = if (!supportsLegacyAuth) mapOf("api_key" to key)
+                    else if (legacyAuth) mapOf("api_key" to "", "app_id" to appId, "access_key" to accessKey)
+                    else mapOf("api_key" to key, "app_id" to "", "access_key" to "")
+                val fields = when {
+                    asr -> authFields + mapOf("resource_id" to resource)
+                    ast -> authFields
+                    else -> authFields + mapOf("base_url" to base, "model" to modelId)
+                }
+                model.saveCredentials(provider, fields)
                 onDismiss(); model.checkSelectedEngines()
-            }, enabled = enabled && (valid || key.isBlank())) { Text(tr("加密保存", "Save encrypted")) }
+            }, enabled = enabled && (valid || clearAuth)) { Text(tr("加密保存", "Save encrypted")) }
         }, dismissButton = { TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) } })
 }
 

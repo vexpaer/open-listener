@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import io.github.vexpaer.openlistener.asr.TranscriptEvent
 import io.github.vexpaer.openlistener.data.SegmentEntity
 import io.github.vexpaer.openlistener.data.SessionEntity
+import io.github.vexpaer.openlistener.data.SentenceGrouper
 import io.github.vexpaer.openlistener.service.MicrophoneRecognitionService.State
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -74,6 +75,7 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
     val partial by model.partial.collectAsState()
     val rms by model.level.collectAsState()
     val error by model.serviceError.collectAsState()
+    val reconnecting by model.reconnecting.collectAsState()
     val check by model.engineCheck.collectAsState()
     val retrying by model.retrying.collectAsState()
     var mode by rememberSaveable { mutableStateOf(TranscriptMode.BILINGUAL) }
@@ -84,8 +86,20 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
     var dragging by remember { mutableStateOf(false) }
     var viewportHeight by remember { mutableIntStateOf(0) }
     val active = state.isSessionActive()
-    val visiblePartial = partial?.takeIf { it.partial && it.text.isNotBlank() && segments.none { final -> final.sequence == it.segmentId && final.revision >= it.revision } }
-    val count = segments.size + if (visiblePartial != null) 1 else 0
+    val isAst = prefs.asrProvider == "doubao_ast"
+    val grouped = remember(segments, isAst) { if (isAst) SentenceGrouper.group(segments) else segments }
+    val currentPartial = partial?.takeIf { it.partial && it.text.isNotBlank() && segments.none { final -> final.sequence == it.segmentId && final.revision >= it.revision } }
+    // The next partial extends the last unfinished punctuation-delimited sentence.
+    val mergeTail = isAst && currentPartial != null && grouped.lastOrNull()?.let {
+        !SentenceGrouper.isSentenceEnd(it.original)
+    } == true
+    val displayed = if (mergeTail) grouped.dropLast(1) else grouped
+    val visiblePartial = if (mergeTail) {
+        val tail = grouped.last()
+        currentPartial?.copy(text = SentenceGrouper.join(tail.original, currentPartial.text),
+            translated = SentenceGrouper.join(tail.translated, currentPartial.translated).ifBlank { null })
+    } else currentPartial
+    val count = displayed.size + if (visiblePartial != null) 1 else 0
     LaunchedEffect(activeId) { if (activeId != null) following = true }
     LaunchedEffect(list) {
         list.interactionSource.interactions.collect { interaction ->
@@ -111,7 +125,7 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
     }
     // Include content revisions and layout changes: one long partial/translation can grow
     // without adding an item. A tail anchor reaches the bottom of oversized paragraphs.
-    LaunchedEffect(segments, visiblePartial, mode, prefs.subtitleFontScale, following, foreground, viewportHeight) {
+    LaunchedEffect(displayed, visiblePartial, mode, prefs.subtitleFontScale, following, foreground, viewportHeight) {
         if (following && foreground && count > 0 && !dragging) {
             withFrameNanos { }
             if (!list.isScrollInProgress && following && !dragging) list.scrollToItem(count)
@@ -122,12 +136,15 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
             DisplayModes(mode, { mode = it })
         }
         if (error != null) ErrorText(error.orEmpty())
+        if (reconnecting) Text(tr("豆包连接中断，正在自动恢复…", "Reconnecting to Doubao…"),
+            color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp))
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
                 count > 0 -> ReadingSurface(backgroundAlpha = .2f) {
                     LazyColumn(state = list, modifier = Modifier.fillMaxSize().nestedScroll(userScroll).onSizeChanged { viewportHeight = it.height }.testTag("live-transcript"),
                         contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                        items(segments, key = { "final-${it.sequence}" }) { segment ->
+                        items(displayed, key = { "final-${it.sequence}" }) { segment ->
                             TranscriptParagraph(segment, mode, prefs.subtitleFontScale, retrying.contains(segment.sequence),
                                 onCopy = { model.copyText(it) }, onRetry = { model.retryTranslation(segment.sessionId, segment.sequence) }, live = true, canRetry = prefs.asrProvider != "doubao_ast")
                         }
@@ -369,6 +386,7 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
         if (current == null) {
             EmptyReading(Icons.Outlined.Description, tr("正在读取记录", "Loading record"), tr("文字保存在此设备。", "Text is stored on this device."))
         } else ReadingSurface {
+            val groupedDetails = if (current.asrProvider == "doubao_ast") SentenceGrouper.group(segments) else segments
             LazyColumn(state = list, modifier = Modifier.fillMaxSize().testTag("record-reading-area"), verticalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(18.dp)) {
             item {
                 Text(current.title, style = MaterialTheme.typography.headlineSmall)
@@ -381,7 +399,7 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
                 }
             }
             if (segments.isEmpty()) item { Text(tr("这场聆听没有已确认的文字。", "This session has no confirmed text."), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            items(segments, key = { it.sequence }) { segment ->
+            items(groupedDetails, key = { it.sequence }) { segment ->
                 TranscriptParagraph(segment, mode, prefs.subtitleFontScale, retrying.contains(segment.sequence), model::copyText,
                     onRetry = { model.retryTranslation(id, segment.sequence) }, canRetry = current.asrProvider != "doubao_ast")
             }
