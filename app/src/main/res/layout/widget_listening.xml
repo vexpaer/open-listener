@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:gravity="center_vertical"
+    android:background="@drawable/widget_background"
+    android:padding="13dp">
+    <TextView android:id="@+id/widget_heading" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:text="Open Listener"
+        android:textColor="#254258" android:textSize="12sp" android:textStyle="bold" />
+    <TextView android:id="@+id/widget_subtitle" android:layout_width="match_parent"
+        android:layout_height="0dp" android:layout_weight="1" android:paddingTop="5dp"
+        android:paddingBottom="5dp" android:text="Tap Start to listen"
+        android:textColor="#172E42" android:textSize="15sp"
+        android:maxLines="3" android:ellipsize="end" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:id="@+id/widget_state" android:layout_width="0dp"
+            android:layout_height="wrap_content" android:layout_weight="1"
+            android:text="Ready" android:textSize="12sp" android:textColor="#4B6478" />
+        <Button android:id="@+id/widget_primary" android:layout_width="wrap_content"
+            android:layout_height="44dp" android:minWidth="80dp" android:text="Start"
+            android:textSize="13sp" android:textAllCaps="false" />
+        <Button android:id="@+id/widget_stop" android:layout_width="wrap_content"
+            android:layout_height="44dp" android:minWidth="68dp" android:text="Stop"
+            android:textSize="13sp" android:textAllCaps="false" />
+    </LinearLayout>
+</LinearLayout>

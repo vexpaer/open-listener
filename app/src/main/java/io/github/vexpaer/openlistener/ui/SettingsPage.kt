@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Brush
@@ -33,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
 import io.github.vexpaer.openlistener.BuildConfig
 import io.github.vexpaer.openlistener.ui.theme.LocalDarkAppearance
+import io.github.vexpaer.openlistener.security.CloudProfile
 import io.github.vexpaer.openlistener.models.ModelPhase
 import java.util.Locale
 
@@ -46,10 +46,15 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
     val installed by model.installedLanguages.collectAsState()
     val languageBusy by model.languageBusy.collectAsState()
     val modelStates by model.modelStates.collectAsState()
+    val cloudProfiles by model.cloudProfiles.collectAsState()
     val editingAllowed = !state.isSessionActive()
     val list = rememberLazyListState()
     var guideFor by rememberSaveable { mutableStateOf<String?>(null) }
     var credentialsFor by rememberSaveable { mutableStateOf<String?>(null) }
+    var chooseCloudKind by rememberSaveable { mutableStateOf<String?>(null) }
+    var newCloudKind by rememberSaveable { mutableStateOf<String?>(null) }
+    var newCloudProvider by rememberSaveable { mutableStateOf<String?>(null) }
+    var editingCloudProfile by remember { mutableStateOf<CloudProfile?>(null) }
     var deleteLanguage by rememberSaveable { mutableStateOf<String?>(null) }
     var deleteModel by rememberSaveable { mutableStateOf<String?>(null) }
     var font by remember(prefs.subtitleFontScale) { mutableFloatStateOf(prefs.subtitleFontScale) }
@@ -80,8 +85,6 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                         if (speech) model.setProviders("local", prefs.translationProvider) else model.setProviders(prefs.asrProvider, "mlkit")
                         page = if (speech) "asr-local" else "translation-local"
                     }, onCloud = {
-                        if (speech && prefs.asrProvider == "local") model.setProviders("doubao", prefs.translationProvider)
-                        if (!speech && prefs.translationProvider == "mlkit") model.setProviders(prefs.asrProvider, "doubao")
                         page = if (speech) "asr-cloud" else "translation-cloud"
                     })
                     }
@@ -166,7 +169,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                                         updates.update?.let { update ->
                                             Hint("${tr("自动匹配安装包", "Matched APK")}: ${update.abi} · ${bytes(update.apk.size)}")
                                         }
-                                        updates.update?.notes?.takeIf { it.isNotBlank() }?.let { notes -> Text(notes, style = MaterialTheme.typography.bodySmall) }
+                                        
                                     }
                                 }
                                 if (updates.downloading) {
@@ -177,7 +180,10 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                                     TextButton(onClick = model::cancelUpdateDownload) { Text(tr("取消下载", "Cancel download")) }
                                 }
                                 if (updates.file != null) {
-                                    Button(onClick = model::installUpdate, enabled = editingAllowed, modifier = Modifier.testTag("install-update")) { Text(tr("交给系统安装", "Install with Android")) }
+                                    Button(onClick = model::installUpdate, enabled = editingAllowed, modifier = Modifier.testTag("install-update")) { Text(tr("安装", "Install")) }
+                                }
+                                updates.update?.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+                                    Text(notes, style = MaterialTheme.typography.bodySmall)
                                 }
                                 if (!editingAllowed) Hint(tr("结束聆听后可更新", "Finish listening to update"))
                                 TextButton(onClick = { model.openUrl("https://github.com/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPOSITORY}") }) { Text("Github") }
@@ -241,24 +247,11 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                             }
                         }
                         "asr-cloud" -> item {
-                            SettingsSection(tr("服务商", "Provider"), Icons.Outlined.Cloud) {
-                                SettingChoice(tr("模型服务", "Model service"), listOf("doubao" to tr("豆包", "Doubao"),
-                                    "doubao_ast" to tr("豆包同传", "Doubao AST"), "qwen" to tr("阿里云", "Aliyun"), "openai" to "OpenAI", "custom" to tr("自定义", "Custom")),
-                                    prefs.asrProvider, enabled = editingAllowed) { model.setProviders(it, prefs.translationProvider) }
-                                val provider = if (prefs.asrProvider in setOf("doubao", "doubao_ast")) prefs.asrProvider else "asr_${prefs.asrProvider}"
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedButton(onClick = { credentialsFor = provider }, enabled = editingAllowed, modifier = Modifier.testTag("asr-credentials")) {
-                                        Text(tr("配置 API", "Configure API"))
-                                    }
-                                    ApiHelpButton("asr-api-help") { guideFor = provider }
-                                }
-                                Hint(if (prefs.asrProvider == "doubao_ast") tr("同传 2.0 · 直接生成原文与译文字幕，不播报译音。", "AST 2.0 · Original and translated subtitles, without spoken output.")
-                                    else tr("豆包为实时识别；其他服务按短音频分段识别。模型 ID 可自由填写，需支持所选接口。", "Doubao streams live; other providers transcribe short audio chunks. Enter any model ID supported by the selected API."))
-                                OutlinedButton(onClick = model::checkSelectedEngines, enabled = !check.busy) {
-                                    Text(if (check.busy) tr("检查中…", "Checking…") else tr("检查配置", "Check setup"))
-                                }
-                                check.detail?.let { Hint(it) }
-                            }
+                            CloudProfilePanel("asr", cloudProfiles.filter { it.kind == "asr" },
+                                model.activeCloudProfile("asr"), editingAllowed,
+                                onSelect = model::selectCloudProfile,
+                                onAdd = { chooseCloudKind = "asr" },
+                                onEdit = { editingCloudProfile = it })
                         }
                         "translation-integrated" -> item {
                             SettingsSection(tr("豆包同声传译", "Doubao simultaneous translation"), Icons.Outlined.Translate) {
@@ -288,22 +281,60 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                             }
                         }
                         "translation-cloud" -> item {
-                            SettingsSection(tr("服务商", "Provider"), Icons.Outlined.Cloud) {
-                                SettingChoice(tr("模型服务", "Model service"), listOf(
-                                    "doubao" to tr("豆包", "Doubao"), "qwen" to tr("阿里云", "Aliyun"),
-                                    "openai" to "OpenAI", "custom" to tr("自定义", "Custom")),
-                                    prefs.translationProvider, enabled = editingAllowed) { model.setProviders(prefs.asrProvider, it) }
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedButton(onClick = { credentialsFor = "translation_${prefs.translationProvider}" },
-                                        enabled = editingAllowed, modifier = Modifier.testTag("translation-credentials")) { Text(tr("配置 API", "Configure API")) }
-                                    ApiHelpButton("translation-api-help") { guideFor = "translation_${prefs.translationProvider}" }
-                                }
-                            }
+                            CloudProfilePanel("translation", cloudProfiles.filter { it.kind == "translation" },
+                                model.activeCloudProfile("translation"), editingAllowed,
+                                onSelect = model::selectCloudProfile,
+                                onAdd = { chooseCloudKind = "translation" },
+                                onEdit = { editingCloudProfile = it })
                         }
                     }
                 }
             }
         }
+    }
+    chooseCloudKind?.let { kind ->
+        val candidates = if (kind == "asr") listOf("doubao", "doubao_ast", "qwen", "openai", "custom")
+            else listOf("doubao", "qwen", "openai", "custom")
+        AlertDialog(onDismissRequest = { chooseCloudKind = null },
+            title = { Text(tr("添加云端配置", "Add cloud model")) },
+            text = {
+                Column {
+                    candidates.forEach { provider ->
+                        TextButton(onClick = {
+                            newCloudKind = kind
+                            newCloudProvider = provider
+                            chooseCloudKind = null
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Text(when (provider) {
+                                "doubao" -> tr("豆包", "Doubao")
+                                "doubao_ast" -> tr("豆包同传", "Doubao AST")
+                                "qwen" -> tr("阿里云", "Aliyun")
+                                "openai" -> "OpenAI"
+                                else -> tr("自定义", "Custom")
+                            })
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { chooseCloudKind = null }) { Text(tr("取消", "Cancel")) } })
+    }
+    newCloudProvider?.let { selected ->
+        val kind = newCloudKind ?: "asr"
+        val providerKey = if (kind == "translation") "translation_$selected"
+            else if (selected in listOf("doubao", "doubao_ast")) selected else "asr_$selected"
+        CredentialsDialog(providerKey, model, editingAllowed,
+            onHelp = { guideFor = providerKey },
+            onDismiss = { newCloudProvider = null; newCloudKind = null },
+            onSaved = { fields -> model.addCloudProfile(kind, selected, fields) })
+    }
+    editingCloudProfile?.let { profile ->
+        val providerKey = if (profile.kind == "translation") "translation_${profile.provider}"
+            else if (profile.provider in listOf("doubao", "doubao_ast")) profile.provider else "asr_${profile.provider}"
+        CredentialsDialog(providerKey, model, editingAllowed,
+            onHelp = { guideFor = providerKey },
+            onDismiss = { editingCloudProfile = null },
+            onSaved = { fields -> model.updateCloudProfile(profile, fields) },
+            editing = profile)
     }
     if (showColorPicker) ThemeColorPicker(prefs.themeColor,
         onDismiss = { showColorPicker = false },
@@ -324,7 +355,38 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
 }
 
 @Composable
-private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, enabled: Boolean, onHelp: () -> Unit, onDismiss: () -> Unit) {
+private fun CloudProfilePanel(kind: String, profiles: List<CloudProfile>, selected: String?,
+                              enabled: Boolean, onSelect: (CloudProfile) -> Unit,
+                              onAdd: () -> Unit, onEdit: (CloudProfile) -> Unit) {
+    SettingsSection(tr("云端配置", "Cloud configurations"), Icons.Outlined.Cloud) {
+        profiles.forEach { profile ->
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(selected = selected == profile.id,
+                    onClick = { onSelect(profile) }, enabled = enabled,
+                    modifier = Modifier.weight(1f).testTag("$kind-profile-${profile.id}"),
+                    label = {
+                        Text(profile.label, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    })
+                IconButton(onClick = { onEdit(profile) }, enabled = enabled) {
+                    Icon(Icons.Outlined.Edit, tr("编辑", "Edit"))
+                }
+            }
+        }
+        OutlinedButton(onClick = onAdd, enabled = enabled,
+            modifier = Modifier.fillMaxWidth().testTag("$kind-add-cloud-profile")) {
+            Icon(Icons.Outlined.Add, null)
+            Text(if (profiles.isEmpty()) "  +  " else "  ")
+            if (profiles.isNotEmpty()) Text(tr("添加配置", "Add configuration"))
+        }
+    }
+}
+
+@Composable
+private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, enabled: Boolean, onHelp: () -> Unit,
+                              onDismiss: () -> Unit, onSaved: ((Map<String, String>) -> Unit)? = null,
+                              editing: CloudProfile? = null) {
     val asr = provider == "doubao"
     val ast = provider == "doubao_ast"
     val supportsLegacyAuth = asr || ast
@@ -336,16 +398,23 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
         else -> ""
     }
     val defaultModel = when (provider) { "translation_qwen" -> "qwen-plus"; "translation_openai" -> "gpt-4.1-mini"; "asr_openai" -> "gpt-transcribe"; "asr_qwen" -> "qwen3-asr-flash"; else -> "" }
+    val existing: (String) -> String = { field ->
+        when {
+            editing != null -> model.profileCredential(editing, field)
+            onSaved != null -> ""
+            else -> model.credential(provider, field)
+        }
+    }
     // Deliberately not rememberSaveable: secrets must never enter Activity saved-state bundles.
-    var key by remember(provider) { mutableStateOf(model.credential(provider, "api_key").ifBlank { if (ast) model.credential("doubao", "api_key") else "" }) }
-    var appId by remember(provider) { mutableStateOf(model.credential(provider, "app_id").ifBlank { if (ast) model.credential("doubao", "app_id") else "" }) }
-    var accessKey by remember(provider) { mutableStateOf(model.credential(provider, "access_key").ifBlank { if (ast) model.credential("doubao", "access_key") else "" }) }
+    var key by remember(provider) { mutableStateOf(existing("api_key").ifBlank { if (ast && onSaved == null) model.credential("doubao", "api_key") else "" }) }
+    var appId by remember(provider) { mutableStateOf(existing("app_id").ifBlank { if (ast && onSaved == null) model.credential("doubao", "app_id") else "" }) }
+    var accessKey by remember(provider) { mutableStateOf(existing("access_key").ifBlank { if (ast && onSaved == null) model.credential("doubao", "access_key") else "" }) }
     var legacyAuth by remember(provider) {
         mutableStateOf(appId.isNotBlank() || accessKey.isNotBlank())
     }
-    var resource by remember(provider) { mutableStateOf(model.credential(provider, "resource_id")) }
-    var base by remember(provider) { mutableStateOf(model.credential(provider, "base_url").ifBlank { defaultBase }) }
-    var modelId by remember(provider) { mutableStateOf(model.credential(provider, "model").ifBlank { defaultModel }) }
+    var resource by remember(provider) { mutableStateOf(existing("resource_id")) }
+    var base by remember(provider) { mutableStateOf(existing("base_url").ifBlank { defaultBase }) }
+    var modelId by remember(provider) { mutableStateOf(existing("model").ifBlank { defaultModel }) }
     val authValid = if (!supportsLegacyAuth || !legacyAuth) key.isNotBlank() else appId.isNotBlank() && accessKey.isNotBlank()
     val valid = authValid && if (asr) resource.isNotBlank() else if (ast) true else base.startsWith("https://") && modelId.isNotBlank()
     val clearAuth = key.isBlank() && appId.isBlank() && accessKey.isBlank()
@@ -391,9 +460,10 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
                     ast -> authFields
                     else -> authFields + mapOf("base_url" to base, "model" to modelId)
                 }
-                model.saveCredentials(provider, fields)
-                onDismiss(); model.checkSelectedEngines()
-            }, enabled = enabled && (valid || clearAuth)) { Text(tr("加密保存", "Save encrypted")) }
+                if (onSaved != null) onSaved(fields) else model.saveCredentials(provider, fields)
+                onDismiss()
+                if (onSaved == null) model.checkSelectedEngines()
+            }, enabled = enabled && if (onSaved != null) valid else valid || clearAuth) { Text(tr("加密保存", "Save encrypted")) }
         }, dismissButton = { TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) } })
 }
 
@@ -486,9 +556,7 @@ private fun ModelCategories(local: Boolean, enabled: Boolean, tag: String, onLoc
     // Only the panel exterior is rounded; tabs and content meet on square edges.
     BoxWithConstraints(Modifier.fillMaxWidth().height(56.dp)) {
         val tabWidth = maxWidth / 2
-        val offset by animateDpAsState(if (local) tabWidth else 0.dp,
-            animationSpec = tween(260), label = "model-selection-slide")
-        Box(Modifier.offset(x = offset).width(tabWidth).fillMaxHeight()
+        Box(Modifier.offset(x = if (local) tabWidth else 0.dp).width(tabWidth).fillMaxHeight()
             .background(MaterialTheme.colorScheme.primary.copy(alpha = .18f)))
         Row(Modifier.fillMaxSize()) {
             listOf(true to tr("本地模型", "Local models"), false to tr("云端模型", "Cloud models")).forEach { (isLocal, label) ->

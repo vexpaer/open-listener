@@ -13,6 +13,7 @@ import io.github.vexpaer.openlistener.asr.EngineAvailability
 import io.github.vexpaer.openlistener.data.AppPreferences
 import io.github.vexpaer.openlistener.data.SegmentEntity
 import io.github.vexpaer.openlistener.data.SentenceGrouper
+import io.github.vexpaer.openlistener.security.CloudProfile
 import io.github.vexpaer.openlistener.data.SessionEntity
 import io.github.vexpaer.openlistener.export.TranscriptExporter
 import io.github.vexpaer.openlistener.export.TranscriptArchive
@@ -85,6 +86,30 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
     val effects = effectChannel.receiveAsFlow()
     private val _notice = MutableStateFlow<String?>(null)
     val notice = _notice.asStateFlow()
+    private val _cloudProfiles = MutableStateFlow<List<CloudProfile>>(emptyList())
+    val cloudProfiles = _cloudProfiles.asStateFlow()
+    fun activeCloudProfile(kind: String): String? = app.cloudProfiles.active(kind)
+    fun profileCredential(profile: CloudProfile, field: String) = app.credentials.get("cloud_profile_${profile.id}", field).orEmpty()
+    private fun reloadCloudProfiles() {
+        _cloudProfiles.value = app.cloudProfiles.list("asr") + app.cloudProfiles.list("translation")
+    }
+    fun addCloudProfile(kind: String, provider: String, fields: Map<String, String>) = viewModelScope.launch {
+        val entry = app.cloudProfiles.add(kind, provider, fields)
+        if (kind == "asr") app.preferences.setProviders(provider, preferences.value.translationProvider)
+        else app.preferences.setProviders(preferences.value.asrProvider, provider)
+        reloadCloudProfiles()
+        checkSelectedEngines()
+    }
+    fun selectCloudProfile(entry: CloudProfile) = editEnginePreference {
+        app.cloudProfiles.activate(entry)
+        if (entry.kind == "asr") app.preferences.setProviders(entry.provider, preferences.value.translationProvider)
+        else app.preferences.setProviders(preferences.value.asrProvider, entry.provider)
+        reloadCloudProfiles()
+    }
+    fun updateCloudProfile(entry: CloudProfile, fields: Map<String, String>) = editEnginePreference {
+        app.cloudProfiles.update(entry, fields)
+        reloadCloudProfiles()
+    }
     val preferences = app.preferences.preferences.stateIn(viewModelScope, SharingStarted.Eagerly, AppPreferences())
     val serviceState = RecognitionRuntime.state
     val activeSessionId = RecognitionRuntime.sessionId
@@ -118,6 +143,7 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
     private var awaitingInstallPermission = false
 
     init {
+        reloadCloudProfiles()
         viewModelScope.launch {
             serviceState.collect { state ->
                 if (state == MicrophoneRecognitionService.State.FINISHED) {

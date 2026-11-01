@@ -155,9 +155,10 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
                 active -> EmptyReading(Icons.Outlined.GraphicEq, tr("等待第一段文字", "Waiting for the first words"),
                     tr("识别到的确认文字会自动保存在本机。", "Confirmed words are saved on this device as you listen."))
                 else -> Column(Modifier.fillMaxSize().testTag("listen-empty"), verticalArrangement = Arrangement.Center) {
-                    Icon(Icons.Outlined.GraphicEq, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Outlined.GraphicEq, null, Modifier.size(38.dp),
+                        tint = androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.primary, Color.Black, .30f))
                     Spacer(Modifier.height(20.dp))
-                    Text(tr("听见课堂，\n读懂每一句。", "Listen clearly.\nRead along."), style = MaterialTheme.typography.headlineLarge)
+                    Text(tr("听见课堂，\n读懂每一句。", "Listen clearly.\nRead along."), style = MaterialTheme.typography.headlineSmall, color = Color.Black)
                     Spacer(Modifier.height(24.dp))
                     if (check.busy) Text(tr("正在检查所选引擎…", "Checking selected engines…"), style = MaterialTheme.typography.bodyMedium)
                     else if (!check.ready) {
@@ -176,7 +177,7 @@ internal fun ListenPage(model: OpenListenerViewModel, foreground: Boolean, onSet
                 Icon(Icons.Outlined.ArrowDownward, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(tr("回到最新", "Latest"))
             }
         }
-        Column(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 12.dp), horizontalAlignment = Alignment.CenterHorizontally,
+        Column(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 12.dp), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
                 val preparing = state == State.PREPARING || state == State.STOPPING
@@ -218,8 +219,8 @@ private fun ListeningButton(label: String, level: Float, enabled: Boolean = true
                 drawCircle(color.copy(alpha = .22f + signal * .3f), radius = size.minDimension * (.42f + .06f * signal), style = Stroke((1.5f + signal * 2f).dp.toPx()))
             }
             val palette = MaterialTheme.colorScheme
-            val top = if (stop) palette.surface else palette.primary.copy(alpha = .88f)
-            val bottom = if (stop) palette.surfaceVariant else palette.primary
+            val top = if (stop) palette.surface else androidx.compose.ui.graphics.lerp(palette.primary, Color.Black, .18f)
+            val bottom = if (stop) palette.surfaceVariant else androidx.compose.ui.graphics.lerp(palette.primary, Color.Black, .32f)
             Button(onClick = onClick, enabled = enabled, shape = CircleShape, interactionSource = interaction,
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent,
                     contentColor = if (stop) palette.onSurface else palette.onPrimary,
@@ -231,7 +232,10 @@ private fun ListeningButton(label: String, level: Float, enabled: Boolean = true
                     .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = .55f), palette.primary.copy(alpha = .12f))), CircleShape)
                     .testTag(tag)) {
                 if (stop) Icon(Icons.Outlined.Stop, contentDescription = label, modifier = Modifier.size(30.dp))
-                else PlayPauseGlyph(recording, label, motion)
+                else if (recording) PlayPauseGlyph(true, label, motion)
+                else Text("🥕", fontSize = 33.sp, modifier = Modifier.semantics { contentDescription = label },
+                    style = androidx.compose.ui.text.TextStyle(
+                        shadow = androidx.compose.ui.graphics.Shadow(Color.White, Offset.Zero, 1f)))
             }
         }
     }
@@ -262,7 +266,7 @@ private fun PlayPauseGlyph(recording: Boolean, label: String, motion: Boolean) {
 
 @Composable
 private fun DisplayModes(mode: TranscriptMode, onSelect: (TranscriptMode) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         TranscriptMode.entries.forEach { option ->
             FilterChip(selected = mode == option, onClick = { onSelect(option) },
                 modifier = Modifier.weight(1f).testTag("transcript-mode-${option.name.lowercase()}"),
@@ -270,12 +274,15 @@ private fun DisplayModes(mode: TranscriptMode, onSelect: (TranscriptMode) -> Uni
                     selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = .20f),
                     selectedLabelColor = MaterialTheme.colorScheme.onSurface),
                 label = {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(when (option) {
                         TranscriptMode.BILINGUAL -> tr("双语", "Bilingual")
                         TranscriptMode.ORIGINAL -> tr("原文", "Original")
                         TranscriptMode.TRANSLATION -> tr("译文", "Translation")
                     }, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.labelSmall)
+                        style = MaterialTheme.typography.labelSmall,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
                 })
         }
     }
@@ -447,6 +454,7 @@ internal val LocalReadingSurfaceAlpha = staticCompositionLocalOf { .20f }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RecordingPlayback(path: String) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -533,9 +541,13 @@ private fun RecordingPlayback(path: String) {
             },
             valueRange = 0f..duration.coerceAtLeast(1).toFloat(),
             enabled = duration > 0 && !loading,
-            modifier = Modifier.weight(1f).testTag("recording-progress")
+            modifier = Modifier.weight(1f).height(20.dp).testTag("recording-progress"),
+            thumb = { Box(Modifier.size(9.dp).background(MaterialTheme.colorScheme.primary, CircleShape)) },
+            track = { slider ->
+                SliderDefaults.Track(slider, modifier = Modifier.height(2.dp),
+                    thumbTrackGapSize = 0.dp, trackInsideCornerSize = 0.dp)
+            }
         )
-        Text(formatTime(duration.toLong()), style = MaterialTheme.typography.labelSmall, maxLines = 1)
     }
     if (failed) Text(tr("无法播放此录音", "Can't play audio"), color = MaterialTheme.colorScheme.error,
         style = MaterialTheme.typography.bodySmall)

@@ -11,6 +11,7 @@ import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import io.github.vexpaer.openlistener.widget.ListeningWidget
 import io.github.vexpaer.openlistener.MainActivity
 import io.github.vexpaer.openlistener.OpenListenerApp
 import io.github.vexpaer.openlistener.R
@@ -111,7 +112,7 @@ class MicrophoneRecognitionService : Service() {
         translator = if (engine!!.capabilities.providesTranslation) null else app.newTranslator(prefs)
         check(engine!!.prepare() == EngineAvailability.Ready) { "Speech engine needs a model or credentials; open Settings" }
         check(translator == null || translator!!.prepare() == EngineAvailability.Ready) { "Translation engine needs language models or credentials; open Settings" }
-        id = app.repository.startSession("Lecture · " + SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(System.currentTimeMillis()),
+        id = app.repository.startSession(SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(System.currentTimeMillis()),
             prefs.sourceLanguage, prefs.targetLanguage, prefs.asrProvider, if (engine!!.capabilities.providesTranslation) "doubao_ast" else prefs.translationProvider)
         if (prefs.retainAudio) {
             val directory = java.io.File(filesDir, "recordings").apply { check(isDirectory || mkdirs()) }
@@ -163,11 +164,14 @@ class MicrophoneRecognitionService : Service() {
         setState(State.RECORDING)
         noticeTicker = scope.launch {
             var previous = ""
+            var widgetTicks = 0
             while (isActive) {
                 if (state in listOf(State.PREPARING, State.RECORDING, State.PAUSED)) {
                     val text = notificationSubtitleText()
-                    val volume = notificationVolume()
-                    val signature = "$state:$notificationSubtitleMode:$text:$volume"
+                                val signature = "$state:$notificationSubtitleMode:$text"
+                    if (++widgetTicks % 4 == 0 || signature != previous) {
+                        ListeningWidget.publish(this@MicrophoneRecognitionService, text, state)
+                    }
                     if (signature != previous) {
                         previous = signature
                         getSystemService(NotificationManager::class.java)
@@ -267,12 +271,13 @@ class MicrophoneRecognitionService : Service() {
                 releaseWakeLock()
                 setState(terminalState)
                 failure?.let { RecognitionRuntime.fail(it) }
+                ListeningWidget.publish(this@MicrophoneRecognitionService, "", terminalState)
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
         }
     }
-    private fun setState(value: State) { state = value; RecognitionRuntime.updateState(value); if (value !in listOf(State.FINISHED, State.ERROR, State.INTERRUPTED)) getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(value.name)) }
+    private fun setState(value: State) { state = value; RecognitionRuntime.updateState(value); ListeningWidget.publish(this, notificationSubtitleText(), value); if (value !in listOf(State.FINISHED, State.ERROR, State.INTERRUPTED)) getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(value.name)) }
     private fun notificationSubtitleText(): String {
         val partial = RecognitionRuntime.partial.value
         return NotificationSubtitle.select(notificationSubtitleMode, partial?.text, partial?.translated,
@@ -301,17 +306,14 @@ class MicrophoneRecognitionService : Service() {
         }
         val subtitle = notificationSubtitleText().trim().take(240)
             .ifEmpty { if (chinese) "等待实时字幕…" else "Waiting for live subtitles…" }
-        val volume = notificationVolume()
         val compact = RemoteViews(packageName, R.layout.notification_compact).apply {
             setTextViewText(R.id.notification_compact_subtitle, subtitle)
-            setProgressBar(R.id.notification_compact_volume, 100, volume, false)
         }
         // The system already displays the app's label in the notification header.
         // Use the content title for actual subtitles instead of repeating "Open Listener".
         val expanded = RemoteViews(packageName, R.layout.notification_live).apply {
             setTextViewText(R.id.notification_subtitle, subtitle)
             setTextViewText(R.id.notification_mode, "$statusText · $modeName")
-            setProgressBar(R.id.notification_volume, 100, volume, false)
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
@@ -319,7 +321,6 @@ class MicrophoneRecognitionService : Service() {
             .setContentIntent(open).setOngoing(true).setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-            .setProgress(100, volume, false)
             .setCustomContentView(compact)
             .setCustomBigContentView(expanded)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())

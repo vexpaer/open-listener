@@ -23,12 +23,5 @@
         android:paddingTop="3dp"
         android:maxLines="1"
         android:textSize="12sp" />
-    <ProgressBar
-        android:id="@+id/notification_volume"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="4dp"
-        android:layout_marginTop="7dp"
-        android:indeterminate="false"
-        android:max="100" />
+
 </LinearLayout>
