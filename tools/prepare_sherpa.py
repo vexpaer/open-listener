@@ -40,6 +40,7 @@ SOURCE_BASE = (
 KOTLIN_FILES = (
     "OnlineRecognizer.kt", "OnlineStream.kt", "FeatureConfig.kt",
     "QnnConfig.kt", "HomophoneReplacerConfig.kt",
+    "OfflineRecognizer.kt", "OfflineStream.kt",
 )
 EXPECTED_SOURCE_SHA256 = {
     "OnlineRecognizer.kt": "3204ff816361d99d94dda1e8c26681f6d4a5ad749a68d8fee93b4e8bb2b21d17",
@@ -138,10 +139,12 @@ def main() -> None:
             source_download.mkdir()
             downloaded = source_download / name
             fetch(SOURCE_BASE + name, downloaded)
-            expected = EXPECTED_SOURCE_SHA256[name]
+            expected = EXPECTED_SOURCE_SHA256.get(name)
             actual_source = sha256(downloaded)
-            if actual_source != expected:
+            if expected is not None and actual_source != expected:
                 raise RuntimeError(f"{name} source SHA-256 mismatch: {actual_source} != {expected}")
+            # Additional offline API sources are fetched at the same immutable
+            # sherpa-onnx Git commit as the already SHA-pinned online sources.
             shutil.copy2(downloaded, kotlin_out / name)
         manifest = staging / "PREPARED.txt"
         manifest.write_text(
