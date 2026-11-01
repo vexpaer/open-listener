@@ -36,7 +36,12 @@ open class OpenListenerApp : Application() {
     open fun newCapture(): io.github.vexpaer.openlistener.audio.PcmCapture = io.github.vexpaer.openlistener.audio.AudioPcmCapture()
 
     open fun newAsr(prefs: AppPreferences): AsrEngine = when (prefs.asrProvider) {
-        "local" -> SherpaStreamingAsr(models, prefs.localAsrModel)
+        "local" -> {
+            val manifest = models.catalog.singleOrNull { it.id == prefs.localAsrModel }
+                ?: throw IllegalArgumentException("Unknown local speech model. Choose a model in Settings.")
+            if (manifest.runtime == "online") SherpaStreamingAsr(models, manifest.id)
+            else SherpaOfflineAsr(models, manifest.id)
+        }
         "doubao" -> DoubaoRealtimeAsr(credentials)
         "doubao_ast" -> DoubaoSimultaneousAsr(credentials, prefs.sourceLanguage, prefs.targetLanguage)
         "qwen", "openai", "custom" -> CloudChunkAsr(prefs.asrProvider, credentials, prefs.sourceLanguage)
