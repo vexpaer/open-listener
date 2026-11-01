@@ -15,9 +15,10 @@ data class ModelManifest(
     val bytes: Long,
     val sha256: String,
     val archiveRoot: String,
-    val files: List<ModelFile>
+    val files: List<ModelFile>,
+    val runtime: String = "online"
 ) {
-    val installedBytes: Long get() = files.sumOf { it.bytes }
+    val installedBytes: Long get() = if (files.any { it.bytes <= 0L }) bytes * 2 else files.sumOf { it.bytes }
 }
 
 /** Hashes measured from the official release, not inferred from filenames. */
@@ -67,6 +68,62 @@ object ModelCatalog {
                 ModelFile("encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx", 67963182, "ac01b68c61d1a716d90baea606b9683ddab07fbd097fc54398d19b027f390ef1"),
                 ModelFile("decoder-epoch-99-avg-1-chunk-16-left-128.onnx", 2093080, "85914f840b71110487ece7a30ebd0bd4b8fb5c2623215bba3aa5ab4c138fc591")
             )
+        ),
+        ModelManifest(
+            id = "sensevoice-small-int8-2024-07-17",
+            displayName = "SenseVoice Small · 多语言 (INT8)",
+            version = "2024-07-17",
+            languages = setOf("zh-CN", "en", "ja", "ko", "yue"), streaming = false,
+            license = "See SenseVoice upstream model license",
+            licenseUrl = "https://github.com/FunAudioLLM/SenseVoice",
+            sourceUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models",
+            url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2",
+            bytes = 163002883L, sha256 = "7d1efa2138a65b0b488df37f8b89e3d91a60676e416f515b952358d83dfd347e",
+            archiveRoot = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+            files = listOf(ModelFile("model.int8.onnx", 0, ""), ModelFile("tokens.txt", 0, "")),
+            runtime = "sensevoice"
+        ),
+        ModelManifest(
+            id = "x-asr-480ms-zh-en-punct-int8-2026-06-05",
+            displayName = "X-ASR · 中文 / English · 480ms (INT8)",
+            version = "2026-06-05",
+            languages = setOf("zh-CN", "en"), streaming = true,
+            license = "Apache-2.0 (model upstream)",
+            licenseUrl = "https://github.com/Gilgamesh-J/X-ASR",
+            sourceUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models",
+            url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-x-asr-480ms-streaming-zipformer-transducer-zh-en-punct-int8-2026-06-05.tar.bz2",
+            bytes = 133895136L, sha256 = "fa5f63d618e5a01526e275a358bb7772e403f84808a4769fba52cffd8160bf74",
+            archiveRoot = "sherpa-onnx-x-asr-480ms-streaming-zipformer-transducer-zh-en-punct-int8-2026-06-05",
+            files = listOf(ModelFile("encoder*.onnx", 0, ""), ModelFile("decoder*.onnx", 0, ""), ModelFile("joiner*.onnx", 0, ""), ModelFile("tokens.txt", 0, "")),
+            runtime = "online"
+        ),
+        ModelManifest(
+            id = "moonshine-v2-en-tiny-2026-02-27",
+            displayName = "Moonshine v2 · English Tiny",
+            version = "2026-02-27",
+            languages = setOf("en"), streaming = false,
+            license = "See Moonshine upstream model license",
+            licenseUrl = "https://github.com/usefulsensors/moonshine",
+            sourceUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models",
+            url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27.tar.bz2",
+            bytes = 29858559L, sha256 = "9ec31b342d8fa3240c3b81b8f82e1cf7e3ac467c93ca5a999b741d5887164f8d",
+            archiveRoot = "sherpa-onnx-moonshine-tiny-en-quantized-2026-02-27",
+            files = listOf(ModelFile("encoder_model.ort", 0, ""), ModelFile("decoder_model_merged.ort", 0, ""), ModelFile("tokens.txt", 0, "")),
+            runtime = "moonshine"
+        ),
+        ModelManifest(
+            id = "moonshine-v2-en-base-2026-02-27",
+            displayName = "Moonshine v2 · English Base",
+            version = "2026-02-27",
+            languages = setOf("en"), streaming = false,
+            license = "See Moonshine upstream model license",
+            licenseUrl = "https://github.com/usefulsensors/moonshine",
+            sourceUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models",
+            url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-moonshine-base-en-quantized-2026-02-27.tar.bz2",
+            bytes = 111266225L, sha256 = "43232c1d13013d37317163baec3135bd771a186a4356f28c889bab453bb0e891",
+            archiveRoot = "sherpa-onnx-moonshine-base-en-quantized-2026-02-27",
+            files = listOf(ModelFile("encoder_model.ort", 0, ""), ModelFile("decoder_model_merged.ort", 0, ""), ModelFile("tokens.txt", 0, "")),
+            runtime = "moonshine"
         ),
         ModelManifest(
             id = "zipformer-en-gigaspeech-2023-06-21-mobile",
