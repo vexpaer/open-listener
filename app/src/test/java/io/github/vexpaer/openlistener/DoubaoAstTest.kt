@@ -4,6 +4,7 @@ import com.google.protobuf.CodedInputStream
 import io.github.vexpaer.openlistener.asr.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.flow.first
 import okhttp3.*
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -124,6 +125,55 @@ class DoubaoAstTest {
         assertTrue(assembler.accept(first.copy(revision = first.revision + 1)))
         assertFalse(assembler.accept(first.copy(revision = first.revision + 2)))
     }
+    @Test fun transientWebSocketDrop_reconnectsAndPreservesQueuedSpeech() = runBlocking {
+        val server = MockWebServer(); server.start()
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                when (fields(bytes.toByteArray())[2] as Long) {
+                    100L -> webSocket.send(response(150))
+                    200L -> webSocket.cancel()
+                }
+            }
+        }))
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            var responded = false
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                when (fields(bytes.toByteArray())[2] as Long) {
+                    100L -> webSocket.send(response(150))
+                    200L -> if (!responded) {
+                        responded = true
+                        webSocket.send(response(650, start = 0))
+                        webSocket.send(response(651, "Recovered"))
+                        webSocket.send(response(652, "Recovered.", start = 0, end = 100))
+                        webSocket.send(response(653, start = 0))
+                        webSocket.send(response(654, "恢复了"))
+                        webSocket.send(response(655, "恢复了。", start = 0, end = 100))
+                    }
+                    102L -> webSocket.send(response(152))
+                }
+            }
+        }))
+        val engine = DoubaoSimultaneousAsr({ "key" }, "en", "zh-CN",
+            endpoint = server.url("/ast").toString(), timeoutMs = 3000)
+        val received = CopyOnWriteArrayList<TranscriptEvent>()
+        val collector = launch(start = CoroutineStart.UNDISPATCHED) { engine.events.collect { received.add(it) } }
+        try {
+            engine.start("recovery")
+            engine.acceptPcm(ByteArray(3200))
+            delay(200)
+            engine.acceptPcm(ByteArray(3200))
+            withTimeout(6000) { engine.reconnecting.first { it } }
+            engine.acceptPcm(ByteArray(3200)) // Captured while the new socket is connecting.
+            withTimeout(6000) { engine.reconnecting.first { !it } }
+            engine.flush()
+            engine.stop()
+            assertTrue(received.any { it.text == "Recovered." && it.translated == "恢复了。" && it.translationFinal })
+            assertNull(engine.errors.value)
+        } finally {
+            engine.close(); collector.cancelAndJoin(); server.shutdown()
+        }
+    }
+
     @Test fun credentialsAndLanguagePairValidation() = runBlocking {
         val missing = DoubaoSimultaneousAsr({ null }, "en", "zh-CN")
         val unsupported = DoubaoSimultaneousAsr({ "key" }, "ja", "fr")
