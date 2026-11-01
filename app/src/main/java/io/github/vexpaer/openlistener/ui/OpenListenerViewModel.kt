@@ -179,6 +179,8 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
 
     fun setRetainAudio(value: Boolean) = editEnginePreference { app.preferences.setRetainAudio(value) }
     fun setLocalAsrModel(value: String) = editEnginePreference { app.preferences.setLocalAsrModel(value) }
+    fun setSolidBackground(value: Boolean) = editPreference { app.preferences.setSolidBackground(value) }
+    fun setNotificationSubtitle(value: String) = editPreference { app.preferences.setNotificationSubtitle(value) }
     fun setThemeColor(value: Long) = editPreference { app.preferences.setThemeColor(value) }
     fun setTheme(value: String) = editPreference { app.preferences.setTheme(value) }
     fun setLanguage(value: String) = editPreference { app.preferences.setLanguage(value) }
