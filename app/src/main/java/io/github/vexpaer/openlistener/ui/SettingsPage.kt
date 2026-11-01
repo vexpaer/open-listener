@@ -118,8 +118,16 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                             SettingsSection(tr("外观", "Appearance"), Icons.Outlined.WbSunny) {
                                 InlineToggle(tr("主题", "Theme"), "light" to tr("浅色", "Light"), "dark" to tr("深色", "Dark"),
                                     if (LocalDarkAppearance.current) "dark" else "light", model::setTheme)
-                                InlineToggle(tr("界面语言", "App language"), "zh" to "中文", "en" to "English",
+                                InlineToggle(tr("界面语言", "Language"), "zh" to "中文", "en" to "English",
                                     if (LocalChinese.current) "zh" else "en", model::setLanguage)
+                                InlineToggle(tr("通知字幕", "Notification"), "original" to tr("原文", "Original"),
+                                    "translation" to tr("译文", "Translated"), prefs.notificationSubtitle, model::setNotificationSubtitle)
+                                Row(Modifier.fillMaxWidth().heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(tr("纯色背景", "Solid background"), Modifier.weight(1f),
+                                        style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false)
+                                    Switch(prefs.solidBackground, model::setSolidBackground,
+                                        modifier = Modifier.testTag("solid-background"))
+                                }
                                 Text(tr("主题颜色", "Accent color"), style = MaterialTheme.typography.labelLarge)
                                 val accents = listOf(0xFFD97757L, 0xFF406B88L, 0xFF8B78C9L, 0xFF5FAF91L, 0xFFE5A548L)
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -430,7 +438,8 @@ private fun LanguageChoice(title: String, value: String, enabled: Boolean, onSel
     var expanded by remember { mutableStateOf(false) }
     Box {
         OutlinedButton(onClick = { expanded = true }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
-            Text("$title · ${languageName(value)}", Modifier.weight(1f)); Icon(Icons.Outlined.ExpandMore, null)
+            Text("$title · ${languageName(value)}", Modifier.weight(1f), maxLines = 1,
+                softWrap = false, overflow = TextOverflow.Ellipsis); Icon(Icons.Outlined.ExpandMore, null)
         }
         DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
             listOf("en", "zh-CN", "ja", "ko", "fr", "de", "es").forEach { language ->
@@ -455,15 +464,17 @@ private fun bytes(value: Long): String = if (value < 1_048_576) "%.0f KB".format
 @Composable
 private fun InlineToggle(title: String, first: Pair<String, String>, second: Pair<String, String>, selected: String, onSelect: (String) -> Unit) {
     Row(Modifier.fillMaxWidth().height(42.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
-        Row(Modifier.width(196.dp).fillMaxHeight().clip(RoundedCornerShape(50))
+        Text(title, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge,
+            maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+        Row(Modifier.width(176.dp).fillMaxHeight().clip(RoundedCornerShape(50))
             .background(MaterialTheme.colorScheme.surface.copy(alpha = .30f))) {
             listOf(first, second).forEach { (key, label) ->
                 val background by animateColorAsState(if (selected == key) MaterialTheme.colorScheme.primary.copy(alpha = .22f) else Color.Transparent,
                     animationSpec = tween(230), label = "settings-selection")
                 Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(50)).background(background)
                     .clickable { onSelect(key) }, contentAlignment = Alignment.Center) {
-                    Text(label, style = MaterialTheme.typography.labelMedium)
+                    Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1,
+                        softWrap = false, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -488,7 +499,8 @@ private fun ModelCategories(local: Boolean, enabled: Boolean, tag: String, onLoc
                     .testTag("$tag-" + if (isLocal) "local-models" else "cloud-models"),
                     contentAlignment = Alignment.Center) {
                     Text(label, color = if (selected) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.titleMedium)
+                        style = MaterialTheme.typography.titleMedium, maxLines = 1, softWrap = false,
+                        overflow = TextOverflow.Ellipsis)
                 }
             }
         }
