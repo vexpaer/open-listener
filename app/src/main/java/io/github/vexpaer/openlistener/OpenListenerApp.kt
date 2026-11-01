@@ -14,6 +14,7 @@ open class OpenListenerApp : Application() {
     val repository by lazy { SessionRepository(database.sessionDao(), database.segmentDao()) }
     val preferences by lazy { PreferencesStore(this) }
     val credentials by lazy { CredentialsStore(this) }
+    val cloudProfiles by lazy { io.github.vexpaer.openlistener.security.CloudProfileStore(credentials) }
     val models by lazy { ModelStore(this) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val recovery by lazy { scope.async {
