@@ -11,6 +11,7 @@ import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import io.github.vexpaer.openlistener.widget.ListeningWidget
 import io.github.vexpaer.openlistener.MainActivity
 import io.github.vexpaer.openlistener.OpenListenerApp
 import io.github.vexpaer.openlistener.R
@@ -163,10 +164,14 @@ class MicrophoneRecognitionService : Service() {
         setState(State.RECORDING)
         noticeTicker = scope.launch {
             var previous = ""
+            var widgetTicks = 0
             while (isActive) {
                 if (state in listOf(State.PREPARING, State.RECORDING, State.PAUSED)) {
                     val text = notificationSubtitleText()
                                 val signature = "$state:$notificationSubtitleMode:$text:$volume"
+                    if (++widgetTicks % 4 == 0 || signature != previous) {
+                        ListeningWidget.publish(this@MicrophoneRecognitionService, text, state)
+                    }
                     if (signature != previous) {
                         previous = signature
                         getSystemService(NotificationManager::class.java)
@@ -266,12 +271,13 @@ class MicrophoneRecognitionService : Service() {
                 releaseWakeLock()
                 setState(terminalState)
                 failure?.let { RecognitionRuntime.fail(it) }
+                ListeningWidget.publish(this@MicrophoneRecognitionService, "", terminalState)
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
         }
     }
-    private fun setState(value: State) { state = value; RecognitionRuntime.updateState(value); if (value !in listOf(State.FINISHED, State.ERROR, State.INTERRUPTED)) getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(value.name)) }
+    private fun setState(value: State) { state = value; RecognitionRuntime.updateState(value); ListeningWidget.publish(this, notificationSubtitleText(), value); if (value !in listOf(State.FINISHED, State.ERROR, State.INTERRUPTED)) getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(value.name)) }
     private fun notificationSubtitleText(): String {
         val partial = RecognitionRuntime.partial.value
         return NotificationSubtitle.select(notificationSubtitleMode, partial?.text, partial?.translated,
