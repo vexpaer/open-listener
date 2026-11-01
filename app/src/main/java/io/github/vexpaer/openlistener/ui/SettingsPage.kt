@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Brush
@@ -166,7 +165,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                                         updates.update?.let { update ->
                                             Hint("${tr("自动匹配安装包", "Matched APK")}: ${update.abi} · ${bytes(update.apk.size)}")
                                         }
-                                        updates.update?.notes?.takeIf { it.isNotBlank() }?.let { notes -> Text(notes, style = MaterialTheme.typography.bodySmall) }
+                                        
                                     }
                                 }
                                 if (updates.downloading) {
@@ -177,7 +176,10 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true) 
                                     TextButton(onClick = model::cancelUpdateDownload) { Text(tr("取消下载", "Cancel download")) }
                                 }
                                 if (updates.file != null) {
-                                    Button(onClick = model::installUpdate, enabled = editingAllowed, modifier = Modifier.testTag("install-update")) { Text(tr("交给系统安装", "Install with Android")) }
+                                    Button(onClick = model::installUpdate, enabled = editingAllowed, modifier = Modifier.testTag("install-update")) { Text(tr("安装", "Install")) }
+                                }
+                                updates.update?.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+                                    Text(notes, style = MaterialTheme.typography.bodySmall)
                                 }
                                 if (!editingAllowed) Hint(tr("结束聆听后可更新", "Finish listening to update"))
                                 TextButton(onClick = { model.openUrl("https://github.com/${BuildConfig.GITHUB_OWNER}/${BuildConfig.GITHUB_REPOSITORY}") }) { Text("Github") }
@@ -486,9 +488,7 @@ private fun ModelCategories(local: Boolean, enabled: Boolean, tag: String, onLoc
     // Only the panel exterior is rounded; tabs and content meet on square edges.
     BoxWithConstraints(Modifier.fillMaxWidth().height(56.dp)) {
         val tabWidth = maxWidth / 2
-        val offset by animateDpAsState(if (local) tabWidth else 0.dp,
-            animationSpec = tween(260), label = "model-selection-slide")
-        Box(Modifier.offset(x = offset).width(tabWidth).fillMaxHeight()
+        Box(Modifier.offset(x = if (local) tabWidth else 0.dp).width(tabWidth).fillMaxHeight()
             .background(MaterialTheme.colorScheme.primary.copy(alpha = .18f)))
         Row(Modifier.fillMaxSize()) {
             listOf(true to tr("本地模型", "Local models"), false to tr("云端模型", "Cloud models")).forEach { (isLocal, label) ->
