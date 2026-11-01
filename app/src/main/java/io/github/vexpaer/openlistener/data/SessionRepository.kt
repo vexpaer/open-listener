@@ -27,6 +27,11 @@ class SessionRepository(private val sessions: SessionDao, private val segments: 
     suspend fun finishSession(id: String, state: String, durationMs: Long, endedAt: Long? = System.currentTimeMillis()) {
         sessions.get(id)?.let { sessions.update(it.copy(state = state, durationMs = durationMs, endedAt = endedAt)) }
     }
+    suspend fun editSegment(sessionId: String, sequence: Long, original: String, translated: String?) {
+        require(original.isNotBlank() || !translated.isNullOrBlank()) { "Empty subtitle" }
+        require(original.length <= 10_000 && (translated?.length ?: 0) <= 10_000)
+        segments.editContents(sessionId, sequence, original.trim(), translated?.trim()?.takeIf { it.isNotBlank() })
+    }
     suspend fun renameSession(id: String, title: String) { require(title.isNotBlank()); sessions.rename(id, title.trim().take(200)) }
     suspend fun setAudioPath(id: String, path: String?) = sessions.setAudioPath(id, path)
     suspend fun deleteSession(id: String) {
