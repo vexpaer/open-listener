@@ -67,7 +67,9 @@ data class UpdateUiState(
     val error: String? = null
 )
 
-data class EngineCheck(val busy: Boolean = false, val ready: Boolean = false, val detail: String? = null,
+data class EngineCheck(val busy: Boolean = false, val checked: Boolean = false,
+                       val ready: Boolean = false, val detail: String? = null,
+                       val needsDownload: Boolean = false, val unavailable: Boolean = false,
                        val missingSpeech: Boolean = false, val missingTranslation: Boolean = false)
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
@@ -158,6 +160,7 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
         if (id == null) flowOf(emptyList()) else repository.observeSegments(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     private val _engineCheck = MutableStateFlow(EngineCheck())
+    private var engineCheckJob: Job? = null
     val engineCheck = _engineCheck.asStateFlow()
     private val _updates = MutableStateFlow(UpdateUiState())
     val updates = _updates.asStateFlow()
@@ -169,6 +172,13 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
 
     init {
         reloadCloudProfiles()
+        viewModelScope.launch {
+            combine(preferences, app.models.state) { prefs, models ->
+                prefs to models[prefs.localAsrModel]?.phase
+            }.distinctUntilChanged().collect {
+                if (!serviceState.value.isSessionActive()) checkSelectedEngines()
+            }
+        }
         viewModelScope.launch {
             serviceState.collect { state ->
                 if (state == MicrophoneRecognitionService.State.FINISHED) {
@@ -207,7 +217,10 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
                     translator?.close()
                 }
                 val detail = availability.detailOrNull()
-                _engineCheck.value = EngineCheck(ready = availability is EngineAvailability.Ready, detail = detail)
+                _engineCheck.value = EngineCheck(checked = true,
+                    ready = availability is EngineAvailability.Ready,
+                    needsDownload = availability is EngineAvailability.NeedsDownload,
+                    unavailable = availability is EngineAvailability.Unavailable, detail = detail)
                 if (availability is EngineAvailability.Ready) effectChannel.send(UiEffect.RequestMicrophoneStart)
                 else _notice.value = detail
             } catch (error: Exception) {
@@ -245,7 +258,11 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
     private fun editEnginePreference(block: suspend () -> Unit) {
         if (serviceState.value.isSessionActive()) {
             notify("请先结束当前聆听，再切换引擎或语言。", "End the current session before changing engines or languages.")
-        } else editPreference { block(); _engineCheck.value = EngineCheck() }
+        } else editPreference {
+            block()
+            _engineCheck.value = EngineCheck()
+            checkSelectedEngines()
+        }
     }
 
     fun credential(provider: String, field: String): String = app.credentials.get(provider, field).orEmpty()
@@ -256,31 +273,46 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
                 if (value.isBlank()) app.credentials.remove(provider, field) else app.credentials.set(provider, field, value.trim())
             }
             _engineCheck.value = EngineCheck()
+            checkSelectedEngines()
             notify("配置已加密保存在本机；不会自动切换服务商。", "Configuration is encrypted on this device. No provider fallback is used.")
         } catch (error: Exception) { showError(error) }
     }
+    /** Resumable, current-settings-only validation; stale checks cannot overwrite a later selection. */
     fun checkSelectedEngines() {
-        if (_engineCheck.value.busy) return
-        viewModelScope.launch {
+        if (serviceState.value.isSessionActive()) return
+        engineCheckJob?.cancel()
+        engineCheckJob = viewModelScope.launch {
             _engineCheck.value = EngineCheck(busy = true)
             try {
-                val speech = app.newAsr(preferences.value)
-                val translation = if (speech.capabilities.providesTranslation) null else app.newTranslator(preferences.value)
+                val selected = preferences.first()
+                val speech = app.newAsr(selected)
+                val translator = if (speech.capabilities.providesTranslation) null else app.newTranslator(selected)
                 var speechStatus: EngineAvailability = EngineAvailability.Ready
                 var translationStatus: EngineAvailability = EngineAvailability.Ready
                 try {
                     speechStatus = speech.availability
-                    translationStatus = translation?.prepare() ?: EngineAvailability.Ready
-                } finally { speech.close(); translation?.close() }
+                    translationStatus = translator?.prepare() ?: EngineAvailability.Ready
+                } finally {
+                    speech.close()
+                    translator?.close()
+                }
                 val result = if (speechStatus !is EngineAvailability.Ready) speechStatus else translationStatus
-                _engineCheck.value = EngineCheck(ready = result is EngineAvailability.Ready,
+                _engineCheck.value = EngineCheck(
+                    checked = true, ready = result is EngineAvailability.Ready,
+                    needsDownload = result is EngineAvailability.NeedsDownload,
+                    unavailable = result is EngineAvailability.Unavailable,
                     missingSpeech = speechStatus !is EngineAvailability.Ready,
                     missingTranslation = translationStatus !is EngineAvailability.Ready,
-                    detail = result.detailOrNull() ?: if (speech.capabilities.providesTranslation) text("豆包同传已配置，可直接生成双语字幕。", "Doubao AST is configured for bilingual subtitles.") else text("所选引擎与语言包已就绪。", "Selected engines and language models are ready."))
-            } catch (error: Exception) { _engineCheck.value = EngineCheck(detail = error.message); showError(error) }
+                    detail = result.detailOrNull() ?: if (speech.capabilities.providesTranslation)
+                        text("豆包同传已配置，可直接生成双语字幕。", "Doubao AST is configured for bilingual subtitles.")
+                        else text("所选引擎与语言包已就绪。", "Selected engines and language models are ready."))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _engineCheck.value = EngineCheck(checked = true, unavailable = true, detail = error.message)
+            }
         }
     }
-
     fun downloadModel(id: String) {
         if (modelJobs[id]?.isActive == true || serviceState.value.isSessionActive()) return
         modelJobs[id] = viewModelScope.launch {
