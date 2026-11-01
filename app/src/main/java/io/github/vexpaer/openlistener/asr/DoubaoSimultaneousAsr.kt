@@ -190,7 +190,7 @@ class DoubaoSimultaneousAsr(
         } catch (timeout: TimeoutCancellationException) {
             connection.socket?.cancel()
             if (!currentCoroutineContext().isActive) throw timeout
-            val failure = IOException("豆包同传连接确认超时，请检查网络与服务权限。")
+            val failure = TransportFailure("豆包同传连接确认超时，正在尝试恢复。")
             fail(connection, failure); throw failure
         } catch (cancelled: CancellationException) {
             connection.socket?.cancel(); throw cancelled
@@ -214,7 +214,8 @@ class DoubaoSimultaneousAsr(
     private suspend fun drain() {
         // The barrier guarantees accepted PCM is sent before FINISH.
         val barrier = CompletableDeferred<Unit>()
-        withTimeout(timeoutMs * 3) {
+        withTimeout(timeoutMs) {
+            check(sender?.isActive == true) { "豆包同传音频发送任务已结束。" }
             pendingAudio.send(PendingAudio(barrier = barrier))
             barrier.await()
         }
