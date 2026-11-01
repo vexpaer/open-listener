@@ -303,6 +303,14 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
         if (clean.isEmpty()) return@launch
         try { repository.renameSession(id, clean) } catch (error: Exception) { showError(error) }
     }
+    fun editSegmentContent(sessionId: String, sequence: Long, original: String, translated: String?) = viewModelScope.launch {
+        if (sessionId == activeSessionId.value && serviceState.value.isSessionActive()) {
+            notify("录音期间不可编辑字幕。", "Finish recording before editing subtitles.")
+            return@launch
+        }
+        try { repository.editSegment(sessionId, sequence, original, translated) }
+        catch (error: Exception) { showError(error) }
+    }
     fun deleteSession(id: String) = viewModelScope.launch {
         if (id == activeSessionId.value && serviceState.value.isSessionActive()) {
             notify("不能删除正在聆听的记录。请先结束。", "End this session before deleting its record.")
