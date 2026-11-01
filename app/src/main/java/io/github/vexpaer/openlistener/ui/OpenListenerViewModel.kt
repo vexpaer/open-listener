@@ -112,8 +112,9 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
         reloadCloudProfiles()
     }
     fun deleteCloudProfile(entry: CloudProfile) = editEnginePreference {
+        val deletingActive = app.cloudProfiles.active(entry.kind) == entry.id
         val remaining = app.cloudProfiles.delete(entry)
-        if (app.cloudProfiles.active(entry.kind) == remaining?.id || remaining == null) {
+        if (deletingActive) {
             if (entry.kind == "asr") {
                 app.preferences.setProviders(remaining?.provider ?: "local", preferences.value.translationProvider)
             } else {
