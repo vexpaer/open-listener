@@ -9,20 +9,20 @@
     android:paddingBottom="6dp">
     <TextView
         android:id="@+id/notification_subtitle"
+        style="@style/TextAppearance.Compat.Notification.Title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:maxLines="3"
         android:ellipsize="end"
-        android:textSize="15sp"
-        android:textColor="?android:attr/textColorPrimary" />
+        android:textSize="15sp" />
     <TextView
         android:id="@+id/notification_mode"
+        style="@style/TextAppearance.Compat.Notification"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingTop="3dp"
         android:maxLines="1"
-        android:textSize="12sp"
-        android:textColor="?android:attr/textColorSecondary" />
+        android:textSize="12sp" />
     <ProgressBar
         android:id="@+id/notification_volume"
         style="?android:attr/progressBarStyleHorizontal"
