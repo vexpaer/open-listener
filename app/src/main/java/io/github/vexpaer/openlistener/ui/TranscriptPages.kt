@@ -246,7 +246,7 @@ private fun ListeningButton(label: String, level: Float, enabled: Boolean = true
                 else if (recording) PlayPauseGlyph(true, label, motion)
                 else Text("🥕", fontSize = 33.sp, modifier = Modifier.semantics { contentDescription = label },
                     style = androidx.compose.ui.text.TextStyle(
-                        shadow = androidx.compose.ui.graphics.Shadow(Color.White, Offset.Zero, 1f)))
+                        shadow = androidx.compose.ui.graphics.Shadow(Color.White, Offset.Zero, 2f)))
             }
         }
     }
