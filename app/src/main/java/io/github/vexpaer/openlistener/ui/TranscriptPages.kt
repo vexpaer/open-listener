@@ -454,6 +454,7 @@ internal val LocalReadingSurfaceAlpha = staticCompositionLocalOf { .20f }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RecordingPlayback(path: String) {
     val context = androidx.compose.ui.platform.LocalContext.current
