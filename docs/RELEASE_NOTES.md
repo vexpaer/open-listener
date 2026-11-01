@@ -8,4 +8,6 @@
 - 胡萝卜开始按钮的颜色加深程度减半，保留录音按钮动画及其他主题色。
 - 历史记录编辑模式直接在正文中修改原文与译文；修改过的段落显示保存／撤销操作，无需再打开编辑弹窗。
 
+- 修复录音播放条圆点与轨道上下错位：两者改为同一 Canvas 绘制，触摸和绘图共用坐标映射，并增加回归测试。
+
 All Android builds and unit tests must pass before the signed release is published.
