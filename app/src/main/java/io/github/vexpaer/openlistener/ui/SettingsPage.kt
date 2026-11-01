@@ -56,6 +56,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
     var newCloudKind by rememberSaveable { mutableStateOf<String?>(null) }
     var newCloudProvider by rememberSaveable { mutableStateOf<String?>(null) }
     var editingCloudProfile by remember { mutableStateOf<CloudProfile?>(null) }
+    var deletingCloudProfile by remember { mutableStateOf<CloudProfile?>(null) }
     var deleteLanguage by rememberSaveable { mutableStateOf<String?>(null) }
     var deleteModel by rememberSaveable { mutableStateOf<String?>(null) }
     var font by remember(prefs.subtitleFontScale) { mutableFloatStateOf(prefs.subtitleFontScale) }
@@ -275,7 +276,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
                         }
                         "asr-cloud" -> item {
                             CloudProfilePanel("asr", cloudProfiles.filter { it.kind == "asr" },
-                                model.activeCloudProfile("asr"), editingAllowed,
+                                model.activeCloudProfile("asr")?.takeIf { prefs.asrProvider != "local" }, editingAllowed,
                                 onSelect = model::selectCloudProfile,
                                 onAdd = { chooseCloudKind = "asr" },
                                 onEdit = { editingCloudProfile = it })
@@ -309,7 +310,7 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
                         }
                         "translation-cloud" -> item {
                             CloudProfilePanel("translation", cloudProfiles.filter { it.kind == "translation" },
-                                model.activeCloudProfile("translation"), editingAllowed,
+                                model.activeCloudProfile("translation")?.takeIf { prefs.translationProvider != "mlkit" }, editingAllowed,
                                 onSelect = model::selectCloudProfile,
                                 onAdd = { chooseCloudKind = "translation" },
                                 onEdit = { editingCloudProfile = it })
@@ -361,7 +362,13 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
             onHelp = { guideFor = providerKey },
             onDismiss = { editingCloudProfile = null },
             onSaved = { fields -> model.updateCloudProfile(profile, fields) },
-            editing = profile)
+            editing = profile, onDelete = { deletingCloudProfile = profile; editingCloudProfile = null })
+    }
+    deletingCloudProfile?.let { profile ->
+        ConfirmDelete(tr("删除云端配置？", "Delete cloud configuration?"),
+            tr("此配置的 API 凭据也将从设备删除。", "The saved API credentials will also be deleted."),
+            onDismiss = { deletingCloudProfile = null },
+            onConfirm = { model.deleteCloudProfile(profile); deletingCloudProfile = null })
     }
     if (showColorPicker) ThemeColorPicker(prefs.themeColor,
         onDismiss = { showColorPicker = false },
@@ -389,13 +396,25 @@ private fun CloudProfilePanel(kind: String, profiles: List<CloudProfile>, select
         profiles.forEach { profile ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterChip(selected = selected == profile.id,
+                Surface(
                     onClick = { onSelect(profile) }, enabled = enabled,
                     modifier = Modifier.weight(1f).testTag("$kind-profile-${profile.id}"),
-                    label = {
+                    color = if (selected == profile.id) MaterialTheme.colorScheme.primary.copy(alpha = .12f)
+                        else Color.Transparent,
+                    shape = RoundedCornerShape(10.dp)) {
+                    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = selected == profile.id,
+                            onCheckedChange = null, enabled = enabled,
+                            modifier = Modifier.size(36.dp),
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = MaterialTheme.colorScheme.primary,
+                                uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant))
                         Text(profile.label, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                    })
+                            modifier = Modifier.weight(1f).padding(start = 6.dp),
+                            style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
                 IconButton(onClick = { onEdit(profile) }, enabled = enabled) {
                     Icon(Icons.Outlined.Edit, tr("编辑", "Edit"))
                 }
@@ -404,8 +423,8 @@ private fun CloudProfilePanel(kind: String, profiles: List<CloudProfile>, select
         OutlinedButton(onClick = onAdd, enabled = enabled,
             modifier = Modifier.fillMaxWidth().testTag("$kind-add-cloud-profile")) {
             Icon(Icons.Outlined.Add, null)
-            Text(if (profiles.isEmpty()) "  +  " else "  ")
-            if (profiles.isNotEmpty()) Text(tr("添加配置", "Add configuration"))
+            Spacer(Modifier.width(7.dp))
+            Text(tr("添加配置", "Add configuration"))
         }
     }
 }
@@ -413,7 +432,7 @@ private fun CloudProfilePanel(kind: String, profiles: List<CloudProfile>, select
 @Composable
 private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, enabled: Boolean, onHelp: () -> Unit,
                               onDismiss: () -> Unit, onSaved: ((Map<String, String>) -> Unit)? = null,
-                              editing: CloudProfile? = null) {
+                              editing: CloudProfile? = null, onDelete: (() -> Unit)? = null) {
     val asr = provider == "doubao"
     val ast = provider == "doubao_ast"
     val supportsLegacyAuth = asr || ast
@@ -433,15 +452,15 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
         }
     }
     // Deliberately not rememberSaveable: secrets must never enter Activity saved-state bundles.
-    var key by remember(provider) { mutableStateOf(existing("api_key").ifBlank { if (ast && onSaved == null) model.credential("doubao", "api_key") else "" }) }
-    var appId by remember(provider) { mutableStateOf(existing("app_id").ifBlank { if (ast && onSaved == null) model.credential("doubao", "app_id") else "" }) }
-    var accessKey by remember(provider) { mutableStateOf(existing("access_key").ifBlank { if (ast && onSaved == null) model.credential("doubao", "access_key") else "" }) }
-    var legacyAuth by remember(provider) {
+    var key by remember(provider, editing?.id, onSaved != null) { mutableStateOf(existing("api_key").ifBlank { if (ast && onSaved == null) model.credential("doubao", "api_key") else "" }) }
+    var appId by remember(provider, editing?.id, onSaved != null) { mutableStateOf(existing("app_id").ifBlank { if (ast && onSaved == null) model.credential("doubao", "app_id") else "" }) }
+    var accessKey by remember(provider, editing?.id, onSaved != null) { mutableStateOf(existing("access_key").ifBlank { if (ast && onSaved == null) model.credential("doubao", "access_key") else "" }) }
+    var legacyAuth by remember(provider, editing?.id, onSaved != null) {
         mutableStateOf(appId.isNotBlank() || accessKey.isNotBlank())
     }
-    var resource by remember(provider) { mutableStateOf(existing("resource_id")) }
-    var base by remember(provider) { mutableStateOf(existing("base_url").ifBlank { defaultBase }) }
-    var modelId by remember(provider) { mutableStateOf(existing("model").ifBlank { defaultModel }) }
+    var resource by remember(provider, editing?.id, onSaved != null) { mutableStateOf(existing("resource_id")) }
+    var base by remember(provider, editing?.id, onSaved != null) { mutableStateOf(existing("base_url").ifBlank { defaultBase }) }
+    var modelId by remember(provider, editing?.id, onSaved != null) { mutableStateOf(existing("model").ifBlank { defaultModel }) }
     val authValid = if (!supportsLegacyAuth || !legacyAuth) key.isNotBlank() else appId.isNotBlank() && accessKey.isNotBlank()
     val valid = authValid && if (asr) resource.isNotBlank() else if (ast) true else base.startsWith("https://") && modelId.isNotBlank()
     val clearAuth = key.isBlank() && appId.isBlank() && accessKey.isBlank()
@@ -490,8 +509,15 @@ private fun CredentialsDialog(provider: String, model: OpenListenerViewModel, en
                 if (onSaved != null) onSaved(fields) else model.saveCredentials(provider, fields)
                 onDismiss()
                 if (onSaved == null) model.checkSelectedEngines()
-            }, enabled = enabled && if (onSaved != null) valid else valid || clearAuth) { Text(tr("加密保存", "Save encrypted")) }
-        }, dismissButton = { TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) } })
+            }, enabled = enabled && if (onSaved != null) valid else valid || clearAuth) { Text(tr("保存", "Save")) }
+        }, dismissButton = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (onDelete != null) TextButton(onClick = onDelete, enabled = enabled) {
+                    Text(tr("删除配置", "Delete"), color = MaterialTheme.colorScheme.error)
+                }
+                TextButton(onClick = onDismiss) { Text(tr("取消", "Cancel")) }
+            }
+        })
 }
 
 @Composable
