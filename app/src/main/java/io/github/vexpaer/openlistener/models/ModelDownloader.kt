@@ -182,7 +182,9 @@ class ModelDownloader {
         withContext(Dispatchers.IO) {
             check(!destination.exists()) { "Extraction requires a new empty directory" }
             check(destination.mkdirs()) { "Unable to create model staging directory" }
-            val wanted = manifest.files.associateBy { it.path }
+            // Every archive is pinned by a verified SHA-256; modern upstream exports
+            // may have dynamic per-file names/sizes, so verify their required roles.
+            val wanted = manifest.files
             val seen = mutableSetOf<String>()
             var entries = 0
             var expanded = 0L
@@ -206,8 +208,10 @@ class ModelDownloader {
                             }
                             expanded += entry.size
                             val relative = normalized.removePrefix(manifest.archiveRoot + "/")
-                            val expected = wanted[relative] ?: continue
-                            check(entry.isFile && entry.size == expected.bytes && seen.add(relative)) {
+                            val expected = wanted.singleOrNull { ModelFileMatcher.matches(it.path, relative) } ?: continue
+                            check(entry.isFile && entry.size > 0L &&
+                                (expected.bytes <= 0L || entry.size == expected.bytes) &&
+                                seen.add(expected.path)) {
                                 "Duplicate or invalid model entry"
                             }
                             val target = safeTarget(destination, relative)
@@ -221,18 +225,21 @@ class ModelDownloader {
                                     val count = tar.read(buffer)
                                     if (count < 0) break
                                     written += count
-                                    check(written <= expected.bytes) { "Oversized model entry" }
+                                    check(written <= entry.size) { "Oversized model entry" }
                                     digest.update(buffer, 0, count)
                                     output.write(buffer, 0, count)
                                 }
-                                check(written == expected.bytes) { "Truncated model entry" }
+                                check(written == entry.size) { "Truncated model entry" }
                             }
-                            check(digest.digest().hex().equals(expected.sha256, true)) { "Extracted weight checksum mismatch" }
+                            val fileSha = digest.digest().hex()
+                            check(expected.sha256.isBlank() || fileSha.equals(expected.sha256, true)) {
+                                "Extracted weight checksum mismatch"
+                            }
                         }
                     }
                 }
             }
-            check(seen == wanted.keys) { "Model archive is missing required files" }
+            check(seen == wanted.map { it.path }.toSet()) { "Model archive is missing required files" }
         }
 
     /** Legacy ZIP helper, bounded and rejects traversal; production uses tar.bz2. */
