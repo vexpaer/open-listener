@@ -89,6 +89,7 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
     private val _cloudProfiles = MutableStateFlow<List<CloudProfile>>(emptyList())
     val cloudProfiles = _cloudProfiles.asStateFlow()
     fun activeCloudProfile(kind: String): String? = app.cloudProfiles.active(kind)
+    fun profileCredential(profile: CloudProfile, field: String) = app.credentials.get("cloud_profile_${profile.id}", field).orEmpty()
     private fun reloadCloudProfiles() {
         _cloudProfiles.value = app.cloudProfiles.list("asr") + app.cloudProfiles.list("translation")
     }
