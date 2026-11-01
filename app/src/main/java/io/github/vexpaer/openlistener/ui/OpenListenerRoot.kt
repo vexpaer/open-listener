@@ -100,7 +100,7 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
             scope.launch { pager.animateScrollToPage(listOf("listen", "library", "settings").indexOf(destination)) }
         }
         Box(Modifier.fillMaxSize()) {
-            AmbientSky(motion, foreground)
+            AmbientSky(motion && !preferences.solidBackground, foreground, preferences.solidBackground)
             Scaffold(containerColor = Color.Transparent, contentColor = MaterialTheme.colorScheme.onBackground, snackbarHost = { SnackbarHost(snackbar) },
                 modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) { padding ->
                 Column(Modifier.fillMaxSize().padding(padding).widthIn(max = 840.dp).align(Alignment.TopCenter)
@@ -121,7 +121,8 @@ fun OpenListenerRoot(viewModel: OpenListenerViewModel, foreground: Boolean) {
                                 .selectable(selected = selected == index, role = Role.Tab,
                                     interactionSource = remember { MutableInteractionSource() }, indication = null,
                                     onClick = { navigateTop(routes[index]) }), contentAlignment = Alignment.Center) {
-                                Text(label, fontWeight = if (selected == index) FontWeight.SemiBold else FontWeight.Normal)
+                                Text(label, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    fontWeight = if (selected == index) FontWeight.SemiBold else FontWeight.Normal)
                             }
                         }
                     }
@@ -189,7 +190,7 @@ private fun rememberMotionEnvironment(): MotionEnvironment {
 
 /** Theme-colored light and fine grain, drawn natively without a full-screen blur pass. */
 @Composable
-private fun AmbientSky(motion: Boolean, foreground: Boolean) {
+private fun AmbientSky(motion: Boolean, foreground: Boolean, solid: Boolean) {
     val dark = LocalDarkAppearance.current
     val tones = LocalThemeTones.current
     val phase = remember { Animatable(0f) }
@@ -207,6 +208,10 @@ private fun AmbientSky(motion: Boolean, foreground: Boolean) {
         }
     }
     Canvas(Modifier.fillMaxSize().testTag("ambient-sky")) {
+        if (solid) {
+            drawRect(tones[1])
+            return@Canvas
+        }
         val t = phase.value // Read animation state during drawing, without recomposing the UI.
         drawRect(Brush.linearGradient(
             tones,
