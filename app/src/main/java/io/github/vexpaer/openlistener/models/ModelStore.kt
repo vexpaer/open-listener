@@ -81,6 +81,14 @@ class ModelStore(context: Context) {
                 currentCoroutineContext().ensureActive()
                 SherpaModelRuntime.validate(staging, model)
                 currentCoroutineContext().ensureActive()
+                // The authenticated release archive pins exact bytes; persist per-file hashes
+                // for models whose upstream release does not publish individual file digests.
+                val fingerprints = model.files.filter { it.sha256.isBlank() }
+                if (fingerprints.isNotEmpty()) {
+                    File(staging, FILE_FINGERPRINTS).writeText(fingerprints.joinToString("\n") {
+                        it.path + " " + downloader.sha256(File(staging, it.path))
+                    } + "\n")
+                }
                 File(staging, MARKER).outputStream().use { stream ->
                     stream.write(model.sha256.toByteArray(Charsets.US_ASCII))
                     stream.fd.sync()
@@ -150,7 +158,13 @@ class ModelStore(context: Context) {
         try {
             model.files.forEach { expected ->
                 currentCoroutineContext().ensureActive()
-                check(downloader.sha256(File(path, expected.path)) == expected.sha256) {
+                val requiredSha = if (expected.sha256.isNotBlank()) expected.sha256 else {
+                    val fingerprintFile = File(path, FILE_FINGERPRINTS)
+                    check(fingerprintFile.isFile) { "Missing installed-model integrity manifest" }
+                    fingerprintFile.readLines().firstOrNull { it.startsWith(expected.path + " ") }
+                        ?.substringAfter(' ') ?: error("Missing model file fingerprint")
+                }
+                check(downloader.sha256(File(path, expected.path)) == requiredSha) {
                     "Installed model is damaged; delete and download it again"
                 }
             }
@@ -172,9 +186,11 @@ class ModelStore(context: Context) {
         val path = directory(model)
         val marker = File(path, MARKER)
         if (!marker.isFile || marker.length() != 64L || marker.readText(Charsets.US_ASCII) != model.sha256) return null
-        return path.takeIf { model.files.all { required ->
+        return path.takeIf {
+            (model.files.all { it.sha256.isNotBlank() } ||
+                File(path, FILE_FINGERPRINTS).isFile) && model.files.all { required ->
             val file = File(path, required.path)
-            file.isFile && file.length() == required.bytes
+            file.isFile && (required.bytes == 0L && file.length() > 0L || file.length() == required.bytes)
         } }
     }
 
@@ -197,6 +213,7 @@ class ModelStore(context: Context) {
     companion object {
         const val DEFAULT_ID = ModelCatalog.DEFAULT_ID
         private const val MARKER = ".verified-sha256"
+        private const val FILE_FINGERPRINTS = ".verified-files-sha256"
         // Shared by all stores in this process, including service/UI and tests.
         private val useLock = Any()
         private val users = mutableMapOf<String, Int>()
