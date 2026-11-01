@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.16 · 2026-11-02
+
+- Automatically validates engine readiness on startup, after model installation, and after configuration changes; cancels stale checks and shows a distinct download/unavailable state instead of misleading configuration notices.
+- Adds four official checksum-pinned local ASR packages: SenseVoice Small INT8, X-ASR 480 ms INT8, Moonshine v2 English Tiny and Base.
+- Integrates sherpa-onnx offline decoding for SenseVoice and Moonshine, with bounded speech/pause-based subtitle segments; X-ASR uses true streaming recognition.
+- Extends private model installer to validate archive-pinned model artifacts and native decoder initialization.
+
+
 ## 0.1.15 · 2026-11-02
 
 - Model selections now use square theme-colored checkboxes for local speech and saved cloud profiles.
