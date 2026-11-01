@@ -7,6 +7,7 @@
 - Local model downloads move into the overflow menu; installed checkmarks follow the installed label.
 - Dark-mode introduction uses white text, and the carrot button is slightly lighter.
 - Saved transcript editing now happens directly on the detail page with contextual Save/Discard buttons.
+- Playback seek knob and rail now share one Canvas centerline with a tested seek-coordinate transform.
 
 
 ## 0.1.14 · 2026-11-02
