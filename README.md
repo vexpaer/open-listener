@@ -10,7 +10,7 @@ Native Android · live bilingual text · optional audio retention
 
 [中文说明](README.zh-CN.md) · [Build](#build) · [Privacy](PRIVACY.md) · [License](LICENSE)
 
-**[Download v0.1.11](https://github.com/vexpaer/open-listener/releases/tag/v0.1.11) · ARM64 and Universal APKs**
+**[Download v0.1.12](https://github.com/vexpaer/open-listener/releases/tag/v0.1.12) · ARM64 and Universal APKs**
 
 </div>
 
@@ -19,6 +19,9 @@ Open Listener is a text-first Android companion for lectures, classes and semina
 > **Hosted build and API 34/35 emulator tests passed for v0.1.0.** Physical-device microphone endurance and real cloud accounts remain unverified. The implementation and outstanding checks are tracked in [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md).
 
 ## What it does
+
+In the expanded foreground notification, you can follow original/translated speech and the live microphone level; select the subtitle language in Settings. The same release adds a solid background option (off by default), a seekable audio player in saved recordings, and theme-colored transcript mode selection. The English UI uses shorter labels and single-line controls.
+
 
 Doubao AST now retries temporary WebSocket interruptions with a bounded in-memory PCM buffer and visible reconnection status. Its source/translated fragments are combined into punctuation-delimited sentences in live view, history, copy and exports while raw event rows are retained for late revisions.
 
