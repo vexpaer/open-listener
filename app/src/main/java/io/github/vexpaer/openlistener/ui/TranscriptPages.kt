@@ -260,14 +260,23 @@ private fun PlayPauseGlyph(recording: Boolean, label: String, motion: Boolean) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DisplayModes(mode: TranscriptMode, onSelect: (TranscriptMode) -> Unit) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         TranscriptMode.entries.forEach { option ->
-            FilterChip(selected = mode == option, onClick = { onSelect(option) }, label = {
-                Text(when (option) { TranscriptMode.BILINGUAL -> tr("双语", "Bilingual"); TranscriptMode.ORIGINAL -> tr("原文", "Original"); TranscriptMode.TRANSLATION -> tr("译文", "Translation") })
-            })
+            FilterChip(selected = mode == option, onClick = { onSelect(option) },
+                modifier = Modifier.weight(1f).testTag("transcript-mode-${option.name.lowercase()}"),
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = .20f),
+                    selectedLabelColor = MaterialTheme.colorScheme.onSurface),
+                label = {
+                    Text(when (option) {
+                        TranscriptMode.BILINGUAL -> tr("双语", "Bilingual")
+                        TranscriptMode.ORIGINAL -> tr("原文", "Original")
+                        TranscriptMode.TRANSLATION -> tr("译文", "Translation")
+                    }, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelSmall)
+                })
         }
     }
 }
@@ -284,7 +293,8 @@ private fun TranscriptParagraph(segment: SegmentEntity, mode: TranscriptMode, fo
             if (segment.translated != null) SelectionContainer {
                 ArrivalText(segment.translated, live,
                     MaterialTheme.typography.bodyLarge.copy(fontSize = (18 * fontScale).sp, lineHeight = (28 * fontScale).sp),
-                    color = MaterialTheme.colorScheme.primary, modifier = Modifier.heightIn(min = 28.dp))
+                    color = if (mode == TranscriptMode.TRANSLATION) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.heightIn(min = 28.dp))
             } else {
                 val failed = segment.translationStatus.contains("FAIL", true) || segment.translationStatus.contains("ERROR", true)
                 Text(if (failed) tr("翻译失败，原文已保存。请检查模型、网络或凭据。", "Translation failed; original text is saved. Check models, network or credentials.")
@@ -304,7 +314,7 @@ private fun PartialParagraph(event: TranscriptEvent, mode: TranscriptMode, fontS
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = .72f))
         if (mode != TranscriptMode.ORIGINAL && !event.translated.isNullOrBlank()) ArrivalText(event.translated, true,
             MaterialTheme.typography.bodyLarge.copy(fontSize = (18 * fontScale).sp, lineHeight = (28 * fontScale).sp),
-            color = MaterialTheme.colorScheme.primary)
+            color = if (mode == TranscriptMode.TRANSLATION) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -392,11 +402,10 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
                 Text(current.title, style = MaterialTheme.typography.headlineSmall)
                 Text("${date(current.startedAt)} · ${formatTime(current.durationMs)} · ${sessionStatus(current.state)}", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
-                DisplayModes(mode, { mode = it })
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (current.audioPath != null && current.state !in listOf("PREPARING", "RECORDING", "PAUSED", "STOPPING")) RecordingPlayback(current.audioPath)
-
+                if (current.audioPath != null && current.state !in listOf("PREPARING", "RECORDING", "PAUSED", "STOPPING")) {
+                    RecordingPlayback(current.audioPath)
                 }
+                DisplayModes(mode, { mode = it })
             }
             if (segments.isEmpty()) item { Text(tr("这场聆听没有已确认的文字。", "This session has no confirmed text."), color = MaterialTheme.colorScheme.onSurfaceVariant) }
             items(groupedDetails, key = { it.sequence }) { segment ->
@@ -446,37 +455,90 @@ private fun RecordingPlayback(path: String) {
     var playing by remember(path) { mutableStateOf(false) }
     var loading by remember(path) { mutableStateOf(false) }
     var failed by remember(path) { mutableStateOf(false) }
+    var duration by remember(path) { mutableIntStateOf(0) }
+    var position by remember(path) { mutableIntStateOf(0) }
+    var draggingTo by remember(path) { mutableStateOf<Float?>(null) }
     DisposableEffect(path, lifecycle) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
-                player?.release(); player = null; playing = false; loading = false
+                player?.release()
+                player = null
+                playing = false
+                loading = false
+                position = 0
             }
         }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer); player?.release(); player = null }
     }
-    TextButton(enabled = !loading, modifier = Modifier.testTag("play-recording"), onClick = {
-        failed = false
-        val current = player
-        if (current != null) {
-            if (playing) current.pause() else current.start()
-            playing = !playing
-        } else try {
-            loading = true
-            val audio = android.media.MediaPlayer()
-            player = audio
-            audio.setAudioAttributes(android.media.AudioAttributes.Builder()
-                .setUsage(android.media.AudioAttributes.USAGE_MEDIA).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
-            audio.setDataSource(context, android.net.Uri.fromFile(java.io.File(path)))
-            audio.setOnPreparedListener { loading = false; playing = true; it.start() }
-            audio.setOnCompletionListener { playing = false; it.seekTo(0) }
-            audio.setOnErrorListener { media, _, _ -> media.release(); player = null; playing = false; loading = false; failed = true; true }
-            audio.prepareAsync()
-        } catch (_: Exception) { player?.release(); player = null; loading = false; failed = true }
-    }) {
-        Text(if (loading) tr("🎧 加载中…", "🎧 Loading…") else if (playing) tr("⏸ 暂停录音", "⏸ Pause recording") else tr("🎧 播放录音", "🎧 Play recording"))
+    LaunchedEffect(player, playing) {
+        while (playing) {
+            val current = player ?: break
+            try { if (current.isPlaying) position = current.currentPosition.coerceAtLeast(0) }
+            catch (_: IllegalStateException) { break }
+            kotlinx.coroutines.delay(250)
+        }
     }
-    if (failed) Text(tr("无法播放此录音", "Unable to play recording"), color = MaterialTheme.colorScheme.error)
+    Row(Modifier.fillMaxWidth().testTag("recording-seekbar"),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        IconButton(enabled = !loading, modifier = Modifier.size(42.dp).testTag("play-recording"), onClick = {
+            failed = false
+            val current = player
+            if (current != null) {
+                try {
+                    if (playing) current.pause() else {
+                        if (duration > 0 && position >= duration) { current.seekTo(0); position = 0 }
+                        current.start()
+                    }
+                    playing = !playing
+                } catch (_: IllegalStateException) { failed = true; playing = false }
+            } else try {
+                loading = true
+                val audio = android.media.MediaPlayer()
+                player = audio
+                audio.setAudioAttributes(android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                audio.setDataSource(context, android.net.Uri.fromFile(java.io.File(path)))
+                audio.setOnPreparedListener {
+                    duration = it.duration.coerceAtLeast(0)
+                    loading = false
+                    playing = true
+                    it.start()
+                }
+                audio.setOnCompletionListener { playing = false; position = duration; it.seekTo(0) }
+                audio.setOnErrorListener { media, _, _ ->
+                    media.release(); player = null; playing = false; loading = false; failed = true; true
+                }
+                audio.prepareAsync()
+            } catch (_: Exception) {
+                player?.release(); player = null; loading = false; failed = true
+            }
+        }) {
+            Icon(if (playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
+                tr(if (playing) "暂停" else "播放", if (playing) "Pause" else "Play"),
+                tint = MaterialTheme.colorScheme.primary)
+        }
+        Text(formatTime((draggingTo?.toInt() ?: position).toLong()),
+            style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        Slider(
+            value = (draggingTo ?: position.toFloat()).coerceIn(0f, duration.coerceAtLeast(1).toFloat()),
+            onValueChange = { draggingTo = it },
+            onValueChangeFinished = {
+                val target = draggingTo?.toInt()?.coerceIn(0, duration)
+                if (target != null && player != null) {
+                    try { player?.seekTo(target); position = target } catch (_: IllegalStateException) { failed = true }
+                }
+                draggingTo = null
+            },
+            valueRange = 0f..duration.coerceAtLeast(1).toFloat(),
+            enabled = duration > 0 && !loading,
+            modifier = Modifier.weight(1f).testTag("recording-progress")
+        )
+        Text(formatTime(duration.toLong()), style = MaterialTheme.typography.labelSmall, maxLines = 1)
+    }
+    if (failed) Text(tr("无法播放此录音", "Can't play audio"), color = MaterialTheme.colorScheme.error,
+        style = MaterialTheme.typography.bodySmall)
 }
 
 /** Each newly arrived character fades over 90 ms; an unchanged prefix stays opaque. */

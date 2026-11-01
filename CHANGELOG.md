@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.12 · 2026-11-01
+
+- Foreground notification displays the latest original or translated subtitles (user-selectable), an expanded audio meter and pause/resume/stop actions; duplicate app title removed.
+- Streamlined English UI labels and enforced single-line controls on compact screens.
+- Optional solid theme background, off by default.
+- Seekable audio playback in saved records with one play/pause control above the transcript modes.
+- Theme-aware selection chips; translation-only reading uses normal foreground text color.
+- Notification presentation unit tests.
+
+
 ## 0.1.11 · 2026-11-01
 
 - 豆包 AST 2.0 自动恢复临时 WebSocket 故障；有界内存音频队列在重连期间缓冲输入，异常时显示恢复状态。

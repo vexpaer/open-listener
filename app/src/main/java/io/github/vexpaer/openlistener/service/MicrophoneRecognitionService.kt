@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.os.PowerManager
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -41,6 +42,13 @@ class MicrophoneRecognitionService : Service() {
     private var errors: Job? = null
     private var connectionState: Job? = null
     private var ticker: Job? = null
+    private var noticeTicker: Job? = null
+    private var noticeSegments: Job? = null
+    private var noticePreferences: Job? = null
+    @Volatile private var notificationSubtitleMode = "original"
+    @Volatile private var notificationChinese = false
+    @Volatile private var latestOriginal = ""
+    @Volatile private var latestTranslation = ""
     private var wakeLock: PowerManager.WakeLock? = null
     @Volatile private var state = State.IDLE
     @Volatile private var terminating = false
@@ -82,6 +90,22 @@ class MicrophoneRecognitionService : Service() {
         setState(State.PREPARING)
         app.recovery.await()
         val prefs = app.preferences.preferences.first()
+        notificationSubtitleMode = prefs.notificationSubtitle
+        notificationChinese = when (prefs.appLanguage) {
+            "zh" -> true
+            "en" -> false
+            else -> resources.configuration.locales[0].language == "zh"
+        }
+        noticePreferences = scope.launch {
+            app.preferences.preferences.collect { next ->
+                notificationSubtitleMode = next.notificationSubtitle
+                notificationChinese = when (next.appLanguage) {
+                    "zh" -> true
+                    "en" -> false
+                    else -> resources.configuration.locales[0].language == "zh"
+                }
+            }
+        }
         engine = app.newAsr(prefs)
         require(prefs.sourceLanguage in engine!!.capabilities.languages) { "Selected speech engine does not support this source language" }
         translator = if (engine!!.capabilities.providesTranslation) null else app.newTranslator(prefs)
@@ -96,6 +120,13 @@ class MicrophoneRecognitionService : Service() {
             app.repository.setAudioPath(id!!, file.absolutePath)
         }
         RecognitionRuntime.begin(id!!)
+        noticeSegments = scope.launch {
+            app.repository.observeSegments(checkNotNull(id)).collect { rows ->
+                val latest = rows.lastOrNull()
+                latestOriginal = latest?.original.orEmpty()
+                latestTranslation = latest?.translated.orEmpty()
+            }
+        }
         translator?.let { queue = TranslationQueue(it, app.repository, prefs.sourceLanguage, prefs.targetLanguage, scope, ::reportFailure) }
         events = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
@@ -130,6 +161,22 @@ class MicrophoneRecognitionService : Service() {
         acquireWakeLock()
         capture.start(scope, RecognitionRuntime::updateLevel, ::reportFailure)
         setState(State.RECORDING)
+        noticeTicker = scope.launch {
+            var previous = ""
+            while (isActive) {
+                if (state in listOf(State.PREPARING, State.RECORDING, State.PAUSED)) {
+                    val text = notificationSubtitleText()
+                    val volume = notificationVolume()
+                    val signature = "$state:$notificationSubtitleMode:$text:$volume"
+                    if (signature != previous) {
+                        previous = signature
+                        getSystemService(NotificationManager::class.java)
+                            .notify(NOTIFICATION_ID, notification(state.name))
+                    }
+                }
+                delay(350)
+            }
+        }
         ticker = scope.launch {
             var ticks = 0
             while (isActive) {
@@ -174,6 +221,9 @@ class MicrophoneRecognitionService : Service() {
         terminating = true
         setState(State.STOPPING)
         ticker?.cancelAndJoin()
+        noticeTicker?.cancelAndJoin()
+        noticeSegments?.cancelAndJoin()
+        noticePreferences?.cancelAndJoin()
         var terminalState = finalState
         var failure = message
         withContext(NonCancellable) {
@@ -223,16 +273,61 @@ class MicrophoneRecognitionService : Service() {
         }
     }
     private fun setState(value: State) { state = value; RecognitionRuntime.updateState(value); if (value !in listOf(State.FINISHED, State.ERROR, State.INTERRUPTED)) getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(value.name)) }
+    private fun notificationSubtitleText(): String {
+        val partial = RecognitionRuntime.partial.value
+        return NotificationSubtitle.select(notificationSubtitleMode, partial?.text, partial?.translated,
+            latestOriginal, latestTranslation)
+    }
+
+    private fun notificationVolume(): Int =
+        NotificationSubtitle.volume(RecognitionRuntime.level.value, state == State.RECORDING)
+
     private fun notification(status: String): Notification {
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), flags)
         val pause = state == State.RECORDING
-        val controlIntent = PendingIntent.getService(this, 1, Intent(this, javaClass).setAction(if (pause) ACTION_PAUSE else ACTION_RESUME), flags)
+        val controlIntent = PendingIntent.getService(this, 1, Intent(this, javaClass)
+            .setAction(if (pause) ACTION_PAUSE else ACTION_RESUME), flags)
         val stop = PendingIntent.getService(this, 2, Intent(this, javaClass).setAction(ACTION_STOP), flags)
-        return NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Open Listener").setContentText(status).setContentIntent(open).setOngoing(true)
-            .setOnlyAlertOnce(true).setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .addAction(0, if (pause) "Pause" else "Resume", controlIntent).addAction(0, "Stop", stop).build()
+        val chinese = notificationChinese
+        val modeName = if (notificationSubtitleMode == "translation") {
+            if (chinese) "译文" else "Translation"
+        } else if (chinese) "原文" else "Original"
+        val statusText = when (state) {
+            State.RECORDING -> if (chinese) "聆听中" else "Listening"
+            State.PAUSED -> if (chinese) "已暂停" else "Paused"
+            State.STOPPING -> if (chinese) "结束中" else "Finishing"
+            else -> if (chinese) "准备中" else "Preparing"
+        }
+        val subtitle = notificationSubtitleText().trim().take(240)
+            .ifEmpty { if (chinese) "等待实时字幕…" else "Waiting for live subtitles…" }
+        val volume = notificationVolume()
+        val compact = RemoteViews(packageName, R.layout.notification_compact).apply {
+            setTextViewText(R.id.notification_compact_subtitle, subtitle)
+            setProgressBar(R.id.notification_compact_volume, 100, volume, false)
+        }
+        // The system already displays the app's label in the notification header.
+        // Use the content title for actual subtitles instead of repeating "Open Listener".
+        val expanded = RemoteViews(packageName, R.layout.notification_live).apply {
+            setTextViewText(R.id.notification_subtitle, subtitle)
+            setTextViewText(R.id.notification_mode, "$statusText · $modeName")
+            setProgressBar(R.id.notification_volume, 100, volume, false)
+        }
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(subtitle).setContentText("$statusText · $modeName")
+            .setContentIntent(open).setOngoing(true).setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setProgress(100, volume, false)
+            .setCustomContentView(compact)
+            .setCustomBigContentView(expanded)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .addAction(0, if (pause) {
+                if (chinese) "暂停" else "Pause"
+            } else { if (chinese) "继续" else "Resume" }, controlIntent)
+            .addAction(0, if (chinese) "结束" else "Stop", stop)
+            .build()
     }
     private fun acquireWakeLock() {
         releaseWakeLock()
