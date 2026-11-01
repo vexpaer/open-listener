@@ -101,9 +101,10 @@ abstract class SegmentDao {
     abstract suspend fun listForSession(sessionId: String): List<SegmentEntity>
     @Query("UPDATE segments SET translated = :translated, translationStatus = :status WHERE sessionId = :sessionId AND sequence = :sequence AND (:revision IS NULL OR revision = :revision)")
     abstract suspend fun updateTranslation(sessionId: String, sequence: Long, translated: String?, status: String, revision: Int? = null)
-    @Query("""UPDATE segments SET original = :original, translated = :translated,
-        translationStatus = 'COMPLETED' WHERE sessionId = :sessionId AND sequence = :sequence""")
-    abstract suspend fun editContents(sessionId: String, sequence: Long, original: String, translated: String?)
+    @Transaction open suspend fun editContents(sessionId: String, sequence: Long, original: String, translated: String?) {
+        val previous = get(sessionId, sequence) ?: return
+        update(previous.copy(original = original, translated = translated, translationStatus = "COMPLETED"))
+    }
     @Query("DELETE FROM segments WHERE sessionId = :sessionId") abstract suspend fun deleteForSession(sessionId: String)
 }
 
