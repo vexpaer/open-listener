@@ -25,6 +25,13 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -645,26 +652,72 @@ private fun RecordingPlayback(path: String, onPlayback: (Int, Boolean) -> Unit =
         }
         Text(formatTime((draggingTo?.toInt() ?: position).toLong()),
             style = MaterialTheme.typography.labelSmall, maxLines = 1)
-        Slider(
-            value = (draggingTo ?: position.toFloat()).coerceIn(0f, duration.coerceAtLeast(1).toFloat()),
-            onValueChange = { draggingTo = it },
-            onValueChangeFinished = {
-                val target = draggingTo?.toInt()?.coerceIn(0, duration)
-                if (target != null && player != null) {
-                    try { player?.seekTo(target); position = target } catch (_: IllegalStateException) { failed = true }
+        val total = duration.coerceAtLeast(0)
+        val visualPosition = (draggingTo ?: position.toFloat()).coerceIn(0f, total.toFloat())
+        val trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .30f)
+        val highlightColor = MaterialTheme.colorScheme.primary
+        fun seekTo(target: Int) {
+            if (total <= 0) return
+            try {
+                player?.seekTo(target)
+                position = target
+            } catch (_: IllegalStateException) { failed = true }
+        }
+        // Single Canvas renders rail and knob with the exact same vertical center.
+        // Drag and tap map to the very same inset coordinates as drawing.
+        Canvas(
+            Modifier.weight(1f).height(36.dp).testTag("recording-progress")
+                .semantics {
+                    contentDescription = "Audio playback position"
+                    progressBarRangeInfo = ProgressBarRangeInfo(visualPosition, 0f..total.coerceAtLeast(1).toFloat())
+                    setProgress { value ->
+                        if (total > 0 && !loading) {
+                            seekTo(value.toInt().coerceIn(0, total))
+                            true
+                        } else false
+                    }
                 }
-                draggingTo = null
-            },
-            valueRange = 0f..duration.coerceAtLeast(1).toFloat(),
-            enabled = duration > 0 && !loading,
-            modifier = Modifier.weight(1f).height(20.dp).testTag("recording-progress"),
-            thumb = { Box(Modifier.size(9.dp).background(MaterialTheme.colorScheme.primary, CircleShape)) },
-            track = { slider ->
-                // Material slider owns track and thumb coordinates, preventing seek misalignment.
-                SliderDefaults.Track(slider, modifier = Modifier.height(3.dp))
-            }
-        )
-    }
+                .pointerInput(total, loading, player) {
+                    detectTapGestures(onTap = { offset ->
+                        if (total > 0 && !loading) {
+                            seekTo(AudioSeekbarGeometry.seekPosition(
+                                offset.x, size.width.toFloat(), 6.dp.toPx(), total))
+                        }
+                    })
+                }
+                .pointerInput(total, loading, player) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            if (total > 0 && !loading)
+                                draggingTo = AudioSeekbarGeometry.seekPosition(
+                                    offset.x, size.width.toFloat(), 6.dp.toPx(), total).toFloat()
+                        },
+                        onDragEnd = {
+                            draggingTo?.let { seekTo(it.toInt().coerceIn(0, total)) }
+                            draggingTo = null
+                        },
+                        onDragCancel = { draggingTo = null },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            if (total > 0 && !loading)
+                                draggingTo = AudioSeekbarGeometry.seekPosition(
+                                    change.position.x, size.width.toFloat(), 6.dp.toPx(), total).toFloat()
+                        })
+                }
+        ) {
+            val inset = 6.dp.toPx()
+            val centerY = size.height / 2f
+            val startX = inset
+            val endX = (size.width - inset).coerceAtLeast(inset)
+            val progressX = AudioSeekbarGeometry.positionX(
+                visualPosition, total.toFloat(), size.width, inset).coerceIn(startX, endX)
+            drawLine(trackColor, Offset(startX, centerY), Offset(endX, centerY),
+                strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
+            drawLine(highlightColor, Offset(startX, centerY), Offset(progressX, centerY),
+                strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
+            drawCircle(highlightColor, radius = 5.dp.toPx(),
+                center = Offset(progressX, centerY))
+        }    }
     if (failed) Text(tr("无法播放此录音", "Can't play audio"), color = MaterialTheme.colorScheme.error,
         style = MaterialTheme.typography.bodySmall)
 }
