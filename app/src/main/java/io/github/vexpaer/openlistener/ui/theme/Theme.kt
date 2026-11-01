@@ -75,6 +75,17 @@ private val DarkColors = darkColorScheme(
     outline = Color(0xFF96A4B9), outlineVariant = Color(0xFF3F5069),
     error = Color(0xFFF18F91), onError = Color(0xFF46151B)
 )
+/** Warm accent hues use Android's modern Noto Serif fallback, never legacy SimSun. */
+internal fun warmAccent(argb: Long): Boolean {
+    val c = Color(argb.toInt())
+    val max = max(c.red, max(c.green, c.blue))
+    val min = min(c.red, min(c.green, c.blue))
+    if (max - min < .11f) return false
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(argb.toInt(), hsv)
+    return hsv[0] < 72f || hsv[0] > 338f
+}
+
 private val EditorialTypography = Typography(
     headlineLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 32.sp, lineHeight = 40.sp),
     headlineSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 24.sp, lineHeight = 32.sp),
@@ -90,6 +101,19 @@ fun OpenListenerTheme(themeMode: String, reducedMotion: Boolean, themeColor: Lon
     CompositionLocalProvider(LocalDarkAppearance provides dark, LocalThemeTones provides themeTones(themeColor, dark)) {
         val primary = Color(themeColor.toInt())
         val scheme = if (dark) DarkColors.copy(primary = themeTones(themeColor, false)[1], primaryContainer = themeTones(themeColor, true)[1]) else LightColors.copy(primary = primary, primaryContainer = themeTones(themeColor, false)[0])
-        MaterialTheme(colorScheme = scheme, typography = EditorialTypography, content = content)
+        val font = if (warmAccent(themeColor)) FontFamily.Serif else FontFamily.SansSerif
+        val type = EditorialTypography.copy(
+            headlineLarge = EditorialTypography.headlineLarge.copy(fontFamily = font),
+            headlineSmall = EditorialTypography.headlineSmall.copy(fontFamily = font),
+            titleLarge = EditorialTypography.titleLarge.copy(fontFamily = font),
+            titleMedium = EditorialTypography.titleMedium.copy(fontFamily = font),
+            titleSmall = EditorialTypography.titleSmall.copy(fontFamily = font),
+            bodyLarge = EditorialTypography.bodyLarge.copy(fontFamily = font),
+            bodyMedium = EditorialTypography.bodyMedium.copy(fontFamily = font),
+            bodySmall = EditorialTypography.bodySmall.copy(fontFamily = font),
+            labelLarge = EditorialTypography.labelLarge.copy(fontFamily = font),
+            labelMedium = EditorialTypography.labelMedium.copy(fontFamily = font),
+            labelSmall = EditorialTypography.labelSmall.copy(fontFamily = font))
+        MaterialTheme(colorScheme = scheme, typography = type, content = content)
     }
 }
