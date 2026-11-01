@@ -301,8 +301,8 @@ private fun DisplayModes(mode: TranscriptMode, onSelect: (TranscriptMode) -> Uni
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun TranscriptParagraph(segment: SegmentEntity, mode: TranscriptMode, fontScale: Float, retrying: Boolean, onCopy: (String) -> Unit, onRetry: () -> Unit, live: Boolean = false, canRetry: Boolean = true) {
-    Column(Modifier.fillMaxWidth().combinedClickable(onClick = {}, onLongClick = { onCopy(listOfNotNull(segment.original, segment.translated).joinToString("\n")) }),
+private fun TranscriptParagraph(segment: SegmentEntity, mode: TranscriptMode, fontScale: Float, retrying: Boolean, onCopy: (String) -> Unit, onRetry: () -> Unit, live: Boolean = false, canRetry: Boolean = true, onEdit: (() -> Unit)? = null) {
+    Column(Modifier.fillMaxWidth().combinedClickable(onClick = { onEdit?.invoke() }, onLongClick = { onCopy(listOfNotNull(segment.original, segment.translated).joinToString("\n")) }),
         verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (mode != TranscriptMode.TRANSLATION) SelectionContainer {
             ArrivalText(segment.original, live, MaterialTheme.typography.bodyLarge.copy(fontSize = (17 * fontScale).sp, lineHeight = (27 * fontScale).sp))
@@ -466,7 +466,12 @@ internal fun SessionDetailPage(id: String, model: OpenListenerViewModel, onBack:
                 val rowContent: @Composable () -> Unit = {
                     TranscriptParagraph(segment, mode, prefs.subtitleFontScale, retrying.contains(segment.sequence),
                         model::copyText, onRetry = { model.retryTranslation(id, segment.sequence) },
-                        canRetry = current.asrProvider != "doubao_ast" && !editMode)
+                        canRetry = current.asrProvider != "doubao_ast" && !editMode,
+                        onEdit = if (editMode) ({
+                            editingSegment = segment
+                            editOriginal = segment.original
+                            editTranslated = segment.translated.orEmpty()
+                        }) else null)
                 }
                 when {
                     editMode -> Surface(
