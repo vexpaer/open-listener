@@ -150,8 +150,13 @@ class ModelStore(context: Context) {
         try {
             model.files.forEach { expected ->
                 currentCoroutineContext().ensureActive()
-                check(downloader.sha256(File(path, expected.path)) == expected.sha256) {
+                val actual = ModelFileMatcher.resolve(path, expected.path)
+                    ?: error("Installed model is missing ${expected.path}")
+                check(actual.length() > 0L && (expected.bytes <= 0L || actual.length() == expected.bytes)) {
                     "Installed model is damaged; delete and download it again"
+                }
+                if (expected.sha256.isNotBlank()) check(downloader.sha256(actual) == expected.sha256) {
+                    "Installed model checksum mismatch; delete and download it again"
                 }
             }
             publish(model, ModelPhase.INSTALLED, model.bytes)
@@ -173,8 +178,8 @@ class ModelStore(context: Context) {
         val marker = File(path, MARKER)
         if (!marker.isFile || marker.length() != 64L || marker.readText(Charsets.US_ASCII) != model.sha256) return null
         return path.takeIf { model.files.all { required ->
-            val file = File(path, required.path)
-            file.isFile && file.length() == required.bytes
+            val file = ModelFileMatcher.resolve(path, required.path)
+            file != null && file.length() > 0L && (required.bytes <= 0L || file.length() == required.bytes)
         } }
     }
 
