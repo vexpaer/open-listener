@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.17 · 2026-11-02
+
+- Avoid repeated SHA-256 file reads when downloading, unpacking, activating or launching local models.
+- Drop installation-time inference validation and increase extraction buffer sizes.
+- Display actual decompressed megabytes while unpacking.
+- Automatically choose the newly installed local ASR model.
+- Keep local filesystem, archive traversal, size and HTTPS protections; retain Android APK signing-certificate identity checks.
+
+
 ## 0.1.16 · 2026-11-02
 
 - Correct stale "configure models" banners: latest-wins preflight, explicit checked status, retry on preference/credential changes and foreground resume.
