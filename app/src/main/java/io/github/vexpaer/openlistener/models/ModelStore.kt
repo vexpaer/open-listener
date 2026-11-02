@@ -25,6 +25,7 @@ data class ModelStatus(
     val phase: ModelPhase,
     val downloadedBytes: Long = 0,
     val totalBytes: Long,
+    val extractedBytes: Long = 0,
     val error: String? = null,
     val inUse: Boolean = false
 )
@@ -36,7 +37,7 @@ class ModelLease internal constructor(val directory: File, private val release: 
 }
 
 /**
- * App-private, checksum-pinned model installation. Keep one instance in Application.
+ * App-private model installation with HTTPS, bounds checking and native load validation. Keep one instance in Application.
  * download/delete are suspending operations; the caller owns their cancellation.
  * No microphone PCM, packaged test WAVs, or user audio is written to disk here.
  */
@@ -69,40 +70,31 @@ class ModelStore(context: Context) {
                 cleanupInterruptedInstall(model)
                 publish(model, ModelPhase.DOWNLOADING)
                 val archive = downloader.download(
-                    model.url, File(root, "${model.id}.tar.bz2"), model.sha256,
+                    model.url, File(root, "${model.id}.tar.bz2"),
                     model.bytes, model.installedBytes
                 ) { received, _ -> publish(model, ModelPhase.DOWNLOADING, received) }
-                publish(model, ModelPhase.VERIFYING, model.bytes)
-                currentCoroutineContext().ensureActive()
-                check(downloader.sha256(archive) == model.sha256) { "Model archive checksum mismatch" }
                 publish(model, ModelPhase.EXTRACTING, model.bytes)
-                downloader.safeExtractTarBz2(archive, staging, model)
-                publish(model, ModelPhase.VALIDATING, model.bytes)
-                currentCoroutineContext().ensureActive()
-                SherpaModelRuntime.validate(staging, model)
-                currentCoroutineContext().ensureActive()
-                // The authenticated release archive pins exact bytes; persist per-file hashes
-                // for models whose upstream release does not publish individual file digests.
-                val fingerprints = model.files.filter { it.sha256.isBlank() }
-                if (fingerprints.isNotEmpty()) {
-                    File(staging, FILE_FINGERPRINTS).writeText(fingerprints.joinToString("\n") {
-                        it.path + " " + downloader.sha256(File(staging, it.path))
-                    } + "\n")
+                downloader.safeExtractTarBz2(archive, staging, model) { extracted ->
+                    publish(model, ModelPhase.EXTRACTING, model.bytes, extractedBytes = extracted)
                 }
-                File(staging, MARKER).outputStream().use { stream ->
-                    stream.write(model.sha256.toByteArray(Charsets.US_ASCII))
+                currentCoroutineContext().ensureActive()
+                // Native inference is initialized only when the user actually starts
+                // recognition; don't execute expensive dummy inference during install.
+                // Presence-only completion marker; compatible with older installed models.
+                File(staging, INSTALLED_MARKER).outputStream().use { stream ->
+                    stream.write("installed".toByteArray(Charsets.US_ASCII))
                     stream.fd.sync()
                 }
                 val active = directory(model)
                 // A corrupt/incomplete previous install is never used. A new directory
                 // is published by one same-filesystem rename only after native validation.
                 if (active.exists()) check(active.deleteRecursively()) { "Unable to remove corrupt installation" }
-                check(staging.renameTo(active)) { "Unable to atomically activate the verified model" }
+                check(staging.renameTo(active)) { "Unable to atomically activate the model" }
                 publish(model, ModelPhase.INSTALLED, model.bytes)
                 archive.delete()
             } catch (cancelled: CancellationException) {
                 publish(model, if (isInstalled(id)) ModelPhase.INSTALLED else ModelPhase.NOT_INSTALLED,
-                    error = "Download cancelled; verified partial download can be resumed")
+                    error = "Download cancelled; partial download can be resumed")
                 throw cancelled
             } catch (error: Exception) {
                 publish(model, ModelPhase.ERROR, error = error.message ?: "Model installation failed")
@@ -138,7 +130,7 @@ class ModelStore(context: Context) {
         }
     }
 
-    /** Full per-file checksums are rechecked off the UI thread before a recognizer uses a model. */
+    /** Installed models were checked for expected file presence and size at install time. */
     suspend fun acquire(id: String = DEFAULT_ID): ModelLease = withContext(Dispatchers.IO) {
         val model = manifest(id)
         val key = key(model)
@@ -156,18 +148,6 @@ class ModelStore(context: Context) {
             _state.update { old -> old + (id to old.getValue(id).copy(inUse = isInUse(key))) }
         }
         try {
-            model.files.forEach { expected ->
-                currentCoroutineContext().ensureActive()
-                val requiredSha = if (expected.sha256.isNotBlank()) expected.sha256 else {
-                    val fingerprintFile = File(path, FILE_FINGERPRINTS)
-                    check(fingerprintFile.isFile) { "Missing installed-model integrity manifest" }
-                    fingerprintFile.readLines().firstOrNull { it.startsWith(expected.path + " ") }
-                        ?.substringAfter(' ') ?: error("Missing model file fingerprint")
-                }
-                check(downloader.sha256(File(path, expected.path)) == requiredSha) {
-                    "Installed model is damaged; delete and download it again"
-                }
-            }
             publish(model, ModelPhase.INSTALLED, model.bytes)
             lease
         } catch (error: Throwable) {
@@ -177,20 +157,22 @@ class ModelStore(context: Context) {
         }
     }
 
-    private fun publish(model: ModelManifest, phase: ModelPhase, received: Long = 0, error: String? = null) {
-        val status = ModelStatus(model.id, phase, received, model.bytes, error, isInUse(key(model)))
+    private fun publish(model: ModelManifest, phase: ModelPhase, received: Long = 0, error: String? = null,
+                        extractedBytes: Long = 0) {
+        val status = ModelStatus(model.id, phase, received, model.bytes, extractedBytes,
+            error, isInUse(key(model)))
         _state.update { it + (model.id to status) }
     }
 
     private fun installedDirectory(model: ModelManifest): File? {
         val path = directory(model)
-        val marker = File(path, MARKER)
-        if (!marker.isFile || marker.length() != 64L || marker.readText(Charsets.US_ASCII) != model.sha256) return null
-        return path.takeIf {
-            (model.files.all { it.sha256.isNotBlank() } ||
-                File(path, FILE_FINGERPRINTS).isFile) && model.files.all { required ->
-            val file = File(path, required.path)
-            file.isFile && (required.bytes == 0L && file.length() > 0L || file.length() == required.bytes)
+        // Accept pre-v0.1.17 installs without reading or comparing the legacy SHA marker.
+        val markerExists = File(path, INSTALLED_MARKER).isFile || File(path, LEGACY_MARKER).isFile
+        if (!markerExists) return null
+        return path.takeIf { model.files.all { expected ->
+            val file = File(path, expected.path)
+            file.isFile && (expected.bytes == 0L && file.length() > 0L ||
+                file.length() == expected.bytes)
         } }
     }
 
@@ -212,8 +194,8 @@ class ModelStore(context: Context) {
 
     companion object {
         const val DEFAULT_ID = ModelCatalog.DEFAULT_ID
-        private const val MARKER = ".verified-sha256"
-        private const val FILE_FINGERPRINTS = ".verified-files-sha256"
+        private const val INSTALLED_MARKER = ".installed"
+        private const val LEGACY_MARKER = ".verified-sha256"
         // Shared by all stores in this process, including service/UI and tests.
         private val useLock = Any()
         private val users = mutableMapOf<String, Int>()

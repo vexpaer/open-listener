@@ -11,7 +11,7 @@ class ModelDownloaderTest {
         val downloader = ModelDownloader()
         assertThrows(IllegalArgumentException::class.java) {
             kotlinx.coroutines.runBlocking {
-                downloader.download("http://example.invalid/model.zip", File("build/model.zip"), "a".repeat(64)) { _, _ -> }
+                downloader.download("http://example.invalid/model.zip", File("build/model.zip")) { _, _ -> }
             }
         }
     }

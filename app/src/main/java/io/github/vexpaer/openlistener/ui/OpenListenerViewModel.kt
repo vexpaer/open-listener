@@ -314,7 +314,19 @@ class OpenListenerViewModel(application: Application) : AndroidViewModel(applica
     fun downloadModel(id: String) {
         if (modelJobs[id]?.isActive == true || serviceState.value.isSessionActive()) return
         modelJobs[id] = viewModelScope.launch {
-            try { app.models.download(id); checkSelectedEngines() } catch (error: Exception) { showError(error) }
+            try {
+                app.models.download(id)
+                // Download success selects this exact local model, even when a cloud
+                // provider or another local model was selected before the download.
+                if (!serviceState.value.isSessionActive()) {
+                    app.preferences.setLocalAsrModel(id)
+                    app.preferences.setProviders("local", preferences.value.translationProvider)
+                    checkSelectedEngines()
+                    notify("已安装并选择本地语音模型。", "Local speech model installed and selected.")
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) { showError(error) }
         }
     }
     fun cancelModelDownload(id: String) { modelJobs[id]?.cancel() }
