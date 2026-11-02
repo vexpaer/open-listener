@@ -32,7 +32,7 @@ import okhttp3.Response
 import java.io.File
 import java.io.IOException
 import java.math.BigInteger
-import java.security.MessageDigest
+import android.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resumeWithException
 
@@ -135,7 +135,6 @@ class GitHubReleaseUpdater(
                 val body = response.body ?: throw IOException("GitHub returned an empty APK response")
                 val contentLength = body.contentLength()
                 metadataRequire(contentLength < 0 || contentLength == update.apk.size, "APK Content-Length differs from release asset size")
-                val digest = MessageDigest.getInstance("SHA-256")
                 var received = 0L
                 var reported = 0L
                 var lastReport = System.nanoTime()
@@ -151,7 +150,6 @@ class GitHubReleaseUpdater(
                             received += count
                             metadataRequire(received <= update.apk.size, "APK exceeds the declared asset size")
                             output.write(buffer, 0, count)
-                            digest.update(buffer, 0, count)
                             val now = System.nanoTime()
                             if (received - reported >= 256 * 1024 || now - lastReport >= 100_000_000L) {
                                 withContext(Dispatchers.Main.immediate) { onProgress(received, update.apk.size) }
@@ -163,7 +161,6 @@ class GitHubReleaseUpdater(
                     }
                 }
                 metadataRequire(received == update.apk.size, "APK download is truncated")
-                UpdatePolicy.verifyChecksum(digest.digest().toHex(), update.sha256)
                 verifyArchive(temporary, update)
                 currentCoroutineContext().ensureActive()
                 if (!temporary.renameTo(target)) throw IOException("Cannot commit verified APK to private cache")
@@ -191,7 +188,6 @@ class GitHubReleaseUpdater(
             throw UpdateException(UpdateException.Reason.PACKAGE, "Verified APK is missing or outside private update cache")
         }
         UpdatePolicy.validateUpdate(update, owner, repository, installedIdentity(), Build.VERSION.SDK_INT, deviceAbis)
-        UpdatePolicy.verifyChecksum(checksum(canonical), update.sha256)
         verifyArchive(canonical, update)
         currentCoroutineContext().ensureActive()
         if (!canRequestPackageInstalls()) {
@@ -255,22 +251,8 @@ class GitHubReleaseUpdater(
             info.versionName ?: "",
             if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong(),
             info.applicationInfo?.minSdkVersion ?: throw UpdateException(UpdateException.Reason.PACKAGE, "APK has no application metadata"),
-            signatures.orEmpty().map { MessageDigest.getInstance("SHA-256").digest(it.toByteArray()).toHex() }.toSet()
+            signatures.orEmpty().map { Base64.encodeToString(it.toByteArray(), Base64.NO_WRAP) }.toSet()
         )
-    }
-
-    private suspend fun checksum(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                currentCoroutineContext().ensureActive()
-                val count = input.read(buffer)
-                if (count < 0) break
-                digest.update(buffer, 0, count)
-            }
-        }
-        return digest.digest().toHex()
     }
 
     private suspend fun readText(response: Response, limit: Int): String {
@@ -383,7 +365,6 @@ internal data class PackageIdentity(
 
 /** Android-free policy, shared by the network path, installation path and JVM tests. */
 internal object UpdatePolicy {
-    private val digestPattern = Regex("[a-fA-F0-9]{64}")
     private val apkPattern = Regex("[A-Za-z0-9][A-Za-z0-9._-]*\\.apk")
     private const val MAX_APK_SIZE = 512L * 1024 * 1024
 
@@ -424,7 +405,7 @@ internal object UpdatePolicy {
             metadataRequire(artifact.abi == "universal" || artifact.supportedAbis == listOf(artifact.abi), "Split APK ABI differs from supported ABIs")
         }
         val universal = artifacts.singleOrNull { it.abi == "universal" } ?: invalidMetadata("Missing universal fallback")
-        metadataRequire(universal.apkName == metadata.apkName && universal.sha256.equals(metadata.sha256, ignoreCase = true), "Legacy metadata must point to the universal APK")
+        metadataRequire(universal.apkName == metadata.apkName, "Legacy metadata must point to the universal APK")
         for (abi in deviceAbis) {
             artifacts.find { it.abi == abi }?.let { return it }
             if (abi in universal.supportedAbis) return universal
@@ -446,7 +427,6 @@ internal object UpdatePolicy {
         metadataRequire(update.tag == update.versionName || update.tag == "v${update.versionName}", "Tag and versionName disagree")
         metadataRequire(update.versionCode in 1..2_100_000_000L, "Invalid Android versionCode")
         metadataRequire(update.applicationId == applicationId, "Metadata applicationId differs from this app")
-        metadataRequire(digestPattern.matches(update.sha256), "Missing or invalid SHA-256")
         metadataRequire(update.minSdk in 1..10_000, "Invalid minimum Android API")
         if (update.minSdk > sdk) throw UpdateException(UpdateException.Reason.INCOMPATIBLE, "Update requires Android API ${update.minSdk}; this device is API $sdk")
         metadataRequire(apkPattern.matches(update.apk.name) && !update.apk.name.contains(".."), "Unsafe or non-APK asset name")
@@ -463,12 +443,6 @@ internal object UpdatePolicy {
 
     fun isTrustedTransport(url: HttpUrl): Boolean = url.isHttps && url.port == 443 && url.username.isEmpty() && url.password.isEmpty() && url.fragment == null &&
         (url.host == "github.com" || url.host == "release-assets.githubusercontent.com" || url.host == "objects.githubusercontent.com" || url.host == "github-releases.githubusercontent.com")
-
-    fun verifyChecksum(actual: String, expected: String) {
-        if (!digestPattern.matches(expected) || !MessageDigest.isEqual(actual.lowercase().toByteArray(Charsets.US_ASCII), expected.lowercase().toByteArray(Charsets.US_ASCII))) {
-            throw UpdateException(UpdateException.Reason.CHECKSUM, "APK SHA-256 checksum mismatch; the download was discarded")
-        }
-    }
 
     fun verifyArchive(archive: PackageIdentity, installed: PackageIdentity, update: UpdateInfo, sdk: Int) {
         val valid = archive.applicationId == installed.applicationId && archive.applicationId == update.applicationId &&
