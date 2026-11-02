@@ -25,6 +25,7 @@ data class ModelStatus(
     val phase: ModelPhase,
     val downloadedBytes: Long = 0,
     val totalBytes: Long,
+    val extractedBytes: Long = 0,
     val error: String? = null,
     val inUse: Boolean = false
 )
@@ -73,11 +74,12 @@ class ModelStore(context: Context) {
                     model.bytes, model.installedBytes
                 ) { received, _ -> publish(model, ModelPhase.DOWNLOADING, received) }
                 publish(model, ModelPhase.EXTRACTING, model.bytes)
-                downloader.safeExtractTarBz2(archive, staging, model)
-                publish(model, ModelPhase.VALIDATING, model.bytes)
+                downloader.safeExtractTarBz2(archive, staging, model) { extracted ->
+                    publish(model, ModelPhase.EXTRACTING, model.bytes, extractedBytes = extracted)
+                }
                 currentCoroutineContext().ensureActive()
-                SherpaModelRuntime.validate(staging, model)
-                currentCoroutineContext().ensureActive()
+                // Native inference is initialized only when the user actually starts
+                // recognition; don't execute expensive dummy inference during install.
                 // Presence-only completion marker; compatible with older installed models.
                 File(staging, INSTALLED_MARKER).outputStream().use { stream ->
                     stream.write("installed".toByteArray(Charsets.US_ASCII))
@@ -155,8 +157,10 @@ class ModelStore(context: Context) {
         }
     }
 
-    private fun publish(model: ModelManifest, phase: ModelPhase, received: Long = 0, error: String? = null) {
-        val status = ModelStatus(model.id, phase, received, model.bytes, error, isInUse(key(model)))
+    private fun publish(model: ModelManifest, phase: ModelPhase, received: Long = 0, error: String? = null,
+                        extractedBytes: Long = 0) {
+        val status = ModelStatus(model.id, phase, received, model.bytes, extractedBytes,
+            error, isInUse(key(model)))
         _state.update { it + (model.id to status) }
     }
 
