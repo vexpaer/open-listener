@@ -13,7 +13,6 @@ import java.io.IOException
 import java.io.RandomAccessFile
 import java.net.HttpURLConnection
 import java.net.URI
-import java.security.MessageDigest
 import java.util.zip.ZipFile
 
 class ModelDownloader {
@@ -21,34 +20,29 @@ class ModelDownloader {
     suspend fun download(
         url: String,
         destination: File,
-        expectedSha256: String,
         onProgress: suspend (received: Long, total: Long?) -> Unit
-    ): File = downloadChecked(url, destination, expectedSha256, null, 0, onProgress)
+    ): File = downloadChecked(url, destination, null, 0, onProgress)
 
     suspend fun download(
         url: String,
         destination: File,
-        expectedSha256: String,
         expectedBytes: Long,
         reserveBytes: Long,
         onProgress: suspend (received: Long, total: Long?) -> Unit
-    ): File = downloadChecked(url, destination, expectedSha256, expectedBytes, reserveBytes, onProgress)
+    ): File = downloadChecked(url, destination, expectedBytes, reserveBytes, onProgress)
 
     private suspend fun downloadChecked(
         url: String,
         destination: File,
-        expectedSha256: String,
         expectedBytes: Long?,
         reserveBytes: Long,
         onProgress: suspend (Long, Long?) -> Unit
     ): File = withContext(Dispatchers.IO) {
         requireHttps(url)
-        require(expectedSha256.matches(Regex("[a-fA-F0-9]{64}"))) { "A real SHA-256 is required" }
         require(expectedBytes == null || expectedBytes > 0)
         val parent = requireNotNull(destination.parentFile)
         check(parent.isDirectory || parent.mkdirs()) { "Unable to create model download directory" }
-        if (destination.isFile && (expectedBytes == null || destination.length() == expectedBytes) &&
-            sha256(destination).equals(expectedSha256, true)) {
+        if (destination.isFile && (expectedBytes == null || destination.length() == expectedBytes)) {
             onProgress(destination.length(), expectedBytes ?: destination.length())
             return@withContext destination
         }
@@ -68,11 +62,7 @@ class ModelDownloader {
                 if (expectedBytes != null && partial.length() != expectedBytes) {
                     throw IOException("Incomplete model download: ${partial.length()} / $expectedBytes bytes")
                 }
-                if (!sha256(partial).equals(expectedSha256, true)) {
-                    partial.delete()
-                    throw IOException("Model checksum does not match the catalog; corrupt partial removed")
-                }
-                check(partial.renameTo(destination)) { "Unable to commit verified archive" }
+                check(partial.renameTo(destination)) { "Unable to commit downloaded archive" }
                 return@withContext destination
             } catch (cancelled: CancellationException) {
                 throw cancelled // Retain .part for an explicit later retry.
@@ -213,7 +203,6 @@ class ModelDownloader {
                             }
                             val target = safeTarget(destination, relative)
                             check(target.parentFile?.isDirectory == true)
-                            val digest = MessageDigest.getInstance("SHA-256")
                             target.outputStream().use { output ->
                                 val buffer = ByteArray(64 * 1024)
                                 var written = 0L
@@ -223,15 +212,10 @@ class ModelDownloader {
                                     if (count < 0) break
                                     written += count
                                     check(written <= entry.size) { "Oversized model entry" }
-                                    digest.update(buffer, 0, count)
                                     output.write(buffer, 0, count)
                                 }
                                 check(written == entry.size) { "Truncated model entry" }
                             }
-                            if (expected.sha256.isNotBlank())
-                                check(digest.digest().hex().equals(expected.sha256, true)) {
-                                    "Extracted weight checksum mismatch"
-                                }
                         }
                     }
                 }
@@ -270,19 +254,6 @@ class ModelDownloader {
         }
     }
 
-    fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                digest.update(buffer, 0, count)
-            }
-        }
-        return digest.digest().hex()
-    }
-
     private fun safeTarget(destination: File, name: String): File {
         check(name.isNotBlank() && !name.contains('\\') && !name.contains(':') && !name.startsWith('/') &&
             name.split('/').none { it == ".." || it == "." }) { "Unsafe model archive path" }
@@ -304,8 +275,6 @@ class ModelDownloader {
             throw IOException("Not enough private storage for model download and installation")
         }
     }
-
-    private fun ByteArray.hex() = joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     companion object {
         private const val MAX_ARCHIVE_BYTES = 1_073_741_824L
