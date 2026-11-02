@@ -168,7 +168,8 @@ class ModelDownloader {
     }
 
     /** Installs only explicitly catalogued weights; no bundled test WAV is written. */
-    suspend fun safeExtractTarBz2(archive: File, destination: File, manifest: ModelManifest) =
+    suspend fun safeExtractTarBz2(archive: File, destination: File, manifest: ModelManifest,
+                                  onProgress: suspend (Long) -> Unit = {}) =
         withContext(Dispatchers.IO) {
             check(!destination.exists()) { "Extraction requires a new empty directory" }
             check(destination.mkdirs()) { "Unable to create model staging directory" }
@@ -176,7 +177,9 @@ class ModelDownloader {
             val seen = mutableSetOf<String>()
             var entries = 0
             var expanded = 0L
-            archive.inputStream().buffered().use { compressed ->
+            var extractedBytes = 0L
+            var lastReported = 0L
+            archive.inputStream().buffered(256 * 1024).use { compressed ->
                 BZip2CompressorInputStream(compressed, false).use { bzip ->
                     TarArchiveInputStream(bzip).use { tar ->
                         while (true) {
@@ -204,7 +207,7 @@ class ModelDownloader {
                             val target = safeTarget(destination, relative)
                             check(target.parentFile?.isDirectory == true)
                             target.outputStream().use { output ->
-                                val buffer = ByteArray(64 * 1024)
+                                val buffer = ByteArray(256 * 1024)
                                 var written = 0L
                                 while (true) {
                                     currentCoroutineContext().ensureActive()
@@ -213,6 +216,11 @@ class ModelDownloader {
                                     written += count
                                     check(written <= entry.size) { "Oversized model entry" }
                                     output.write(buffer, 0, count)
+                                    extractedBytes += count
+                                    if (extractedBytes - lastReported >= 512 * 1024) {
+                                        onProgress(extractedBytes)
+                                        lastReported = extractedBytes
+                                    }
                                 }
                                 check(written == entry.size) { "Truncated model entry" }
                             }
@@ -221,6 +229,7 @@ class ModelDownloader {
                 }
             }
             check(seen == wanted.keys) { "Model archive is missing required files" }
+            onProgress(extractedBytes)
         }
 
     /** Legacy ZIP helper, bounded and rejects traversal; production uses tar.bz2. */
