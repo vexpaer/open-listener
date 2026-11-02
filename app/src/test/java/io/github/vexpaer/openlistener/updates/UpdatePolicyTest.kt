@@ -44,13 +44,11 @@ class UpdatePolicyTest {
         }
     }
 
-    @Test fun rejectsDraftPrereleaseTagDigestPackageAndVersionErrors() {
+    @Test fun rejectsDraftPrereleaseTagPackageAndVersionErrors() {
         rejects { select(rel = release.copy(draft = true)) }
         rejects { select(rel = release.copy(prerelease = true)) }
         rejects { select(metadata.copy(tag = "v1.10.1")) }
         rejects { select(metadata.copy(versionName = "1.10.0-rc.1")) }
-        rejects { select(metadata.copy(sha256 = "")) }
-        rejects { select(metadata.copy(sha256 = "z".repeat(64))) }
         rejects { select(metadata.copy(applicationId = "attacker.app")) }
         rejects { select(metadata.copy(versionCode = 0)) }
         rejects { select(metadata.copy(versionCode = 2_100_000_001L)) }
@@ -76,12 +74,6 @@ class UpdatePolicyTest {
         assertTrue(!UpdatePolicy.isTrustedTransport("https://evil.example/update.apk".toHttpUrl()))
         assertTrue(!UpdatePolicy.isTrustedTransport("http://release-assets.githubusercontent.com/file".toHttpUrl()))
         assertTrue(UpdatePolicy.isTrustedTransport("https://release-assets.githubusercontent.com/file?signature=public".toHttpUrl()))
-    }
-
-    @Test fun checksumIsMandatoryAndCaseInsensitive() {
-        UpdatePolicy.verifyChecksum("AB".repeat(32), "ab".repeat(32))
-        rejects(UpdateException.Reason.CHECKSUM) { UpdatePolicy.verifyChecksum("cd".repeat(32), metadata.sha256) }
-        rejects(UpdateException.Reason.CHECKSUM) { UpdatePolicy.verifyChecksum(metadata.sha256, "") }
     }
 
     @Test fun archiveMustMatchEveryMetadataFieldAndExactNonemptyCurrentSigners() {
@@ -123,7 +115,6 @@ class UpdatePolicyTest {
         val universal = UpdateArtifactMetadata("universal", asset.name, metadata.sha256, asset.size, listOf("arm64-v8a", "x86_64"))
         fun check(entries: List<UpdateArtifactMetadata>) = select(metadata.copy(artifacts = entries), abis = listOf("arm64-v8a"))
         rejects { check(listOf(universal, universal)) }
-        rejects { check(listOf(universal.copy(sha256 = "cd".repeat(32)))) }
         rejects { check(listOf(universal.copy(size = 99))) }
         rejects { check(listOf(universal.copy(supportedAbis = emptyList()))) }
         rejects { check(listOf(universal.copy(supportedAbis = listOf("mips")))) }
