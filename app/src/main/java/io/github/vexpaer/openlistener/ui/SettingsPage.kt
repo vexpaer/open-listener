@@ -268,7 +268,14 @@ internal fun SettingsPage(model: OpenListenerViewModel, active: Boolean = true,
                                                     Text("${bytes(downloaded)} / ${bytes(total)}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
                                                     TextButton(onClick = { model.cancelModelDownload(manifest.id) }) { Text(tr("取消", "Cancel")) }
                                                 }
-                                            } else if (phase in listOf(ModelPhase.VERIFYING, ModelPhase.EXTRACTING, ModelPhase.VALIDATING)) LinearProgressIndicator(Modifier.fillMaxWidth())
+                                            } else if (phase in listOf(ModelPhase.VERIFYING, ModelPhase.EXTRACTING, ModelPhase.VALIDATING)) {
+                                                LinearProgressIndicator(Modifier.fillMaxWidth())
+                                                if (phase == ModelPhase.EXTRACTING) {
+                                                    Text(tr("已解压 ", "Extracted ") + bytes(status?.extractedBytes ?: 0L),
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                            }
                                             status?.error?.let { ErrorText(it) }
                                         }
                                     }
